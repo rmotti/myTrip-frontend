@@ -1,34 +1,41 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react'
+import Login from './Login'
+import { auth } from '../firebaseConfig'
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [user, setUser] = useState<User | null>(null)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u)
+      setChecking(false)
+    })
+    return () => unsub()
+  }, [])
+
+  if (checking) {
+    return <p style={{ padding: 24 }}>Carregando…</p>
+  }
+
+  if (!user) {
+    return <Login />
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn 
+    <div style={{ padding: 24, maxWidth: 640, margin: '0 auto' }}>
+      <h2>Bem-vindo</h2>
+      <p style={{ marginTop: 8 }}>
+        Logado como: <strong>{user.email ?? user.displayName ?? 'Usuário'}</strong>
       </p>
-    </>
+      <button
+        style={{ marginTop: 16, padding: 10, borderRadius: 8, cursor: 'pointer' }}
+        onClick={() => signOut(auth)}
+      >
+        Sair
+      </button>
+    </div>
   )
 }
 
