@@ -1,17 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, PropsWithChildren } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './Login'
+import Register from './Register' // novo
 import { auth } from '../firebaseConfig'
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
 
-function App() {
+function Protected({ isAuthed, children }: PropsWithChildren<{ isAuthed: boolean }>) {
+  return isAuthed ? <>{children}</> : <Navigate to="/login" replace />
+}
+function GuestOnly({ isAuthed, children }: PropsWithChildren<{ isAuthed: boolean }>) {
+  return isAuthed ? <Navigate to="/" replace /> : <>{children}</>
+}
+
+export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u)
-      setChecking(false)
-    })
+    const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setChecking(false) })
     return () => unsub()
   }, [])
 
@@ -26,10 +32,41 @@ function App() {
     )
   }
 
-  if (!user) {
-    return <Login />
-  }
+  return (
+    <Routes>
+      {/* Home protegida (logado) */}
+      <Route
+        path="/"
+        element={
+          <Protected isAuthed={!!user}>
+            <Home user={user!} />
+          </Protected>
+        }
+      />
+      {/* Login e Registro só para convidados */}
+      <Route
+        path="/login"
+        element={
+          <GuestOnly isAuthed={!!user}>
+            <Login />
+          </GuestOnly>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <GuestOnly isAuthed={!!user}>
+            <Register />
+          </GuestOnly>
+        }
+      />
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />
+    </Routes>
+  )
+}
 
+function Home({ user }: { user: User }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white/90 backdrop-blur border-b border-slate-200">
@@ -47,12 +84,10 @@ function App() {
       <main className="mx-auto max-w-5xl px-4 py-8">
         <h2 className="text-2xl font-bold text-slate-900">Bem-vindo</h2>
         <p className="mt-2 text-slate-700">
-          Logado como: <span className="font-medium">{user.email ?? user.displayName ?? 'Usuário'}</span>
+          Logado como:{' '}
+          <span className="font-medium">{user.email ?? user.displayName ?? 'Usuário'}</span>
         </p>
       </main>
     </div>
   )
 }
-
-export default App
-
