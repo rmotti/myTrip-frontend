@@ -1,4 +1,5 @@
-import { useEffect, useState, PropsWithChildren } from 'react'
+import { useEffect, useState } from 'react'
+import type { PropsWithChildren } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './Login'
 import Register from './Register' // novo
