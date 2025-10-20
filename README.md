@@ -1,73 +1,81 @@
-# React + TypeScript + Vite
+# 🌍 MyTrip — Planejador de Viagens
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MyTrip é uma aplicação web desenvolvida em **React + Vite**, que permite ao usuário **planejar suas viagens**, gerenciando **destinos, orçamentos e categorias de gastos** (como passagens, hospedagem e passeios).  
+O projeto utiliza **Firebase Authentication** para login e registro de usuários.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Tecnologias
 
-## React Compiler
+- **React + Vite**
+- **TypeScript**
+- **Firebase Authentication**
+- **TailwindCSS**
+- **React Router**
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## ⚙️ Configuração do Ambiente
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+```bash
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+````
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+> ⚠️ As chaves acima vêm do seu projeto no [Firebase Console](https://console.firebase.google.com/).
+> Nunca compartilhe o `.env` real — apenas o `.env.example` pode ser versionado.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 🧠 Scripts
+
+```bash
+# Instalar dependências
+npm install
+
+# Rodar localmente
+npm run dev
+
+# Build de produção
+npm run build
+
+# Pré-visualizar build
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 📁 Estrutura resumida
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+mytrip-frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── hooks/
+│   ├── firebase/
+│   └── main.tsx
+├── .env.example
+├── .gitignore
+└── package.json
+```
+
+---
+
+## 🔒 Observações
+
+* O arquivo `.env` **não deve ser commitado** (já configurado no `.gitignore`).
+* Futuramente, um **backend** poderá ser adicionado para armazenar viagens, orçamentos e recomendações personalizadas.
+
+---
+
+## 👨‍💻 Autor
+
+Desenvolvido por **Rodrigo Motti** — projeto pessoal de aprendizado em React e arquitetura full-stack.
+
