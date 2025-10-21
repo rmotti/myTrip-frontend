@@ -1,8 +1,15 @@
+// src/pages/Register.tsx
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { auth, googleProvider } from '../firebaseConfig'
 import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth'
 
+// ======== CONFIG ========
+const API_URL_RAW = import.meta.env.VITE_API_URL
+const API_URL = (API_URL_RAW || '').replace(/\/$/, '')
+console.log('🛰️ API_URL =>', API_URL)
+
+// ======== HELPERS ========
 const mapFirebaseError = (code?: string) => {
   switch (code) {
     case 'auth/invalid-email': return 'E-mail inválido.'
@@ -11,6 +18,24 @@ const mapFirebaseError = (code?: string) => {
     case 'auth/network-request-failed': return 'Falha de rede. Tente novamente.'
     default: return 'Ocorreu um erro. Tente novamente.'
   }
+}
+
+async function callBackend(path: string, token?: string, init?: RequestInit) {
+  const url = `${API_URL}${path}`
+  console.log('📡 FETCH:', url, init?.method || 'GET')
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      ...(init?.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'Content-Type': 'application/json',
+    },
+  })
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`${res.status} ${res.statusText}: ${errText}`)
+  }
+  return res.json()
 }
 
 export default function Register() {
@@ -26,15 +51,48 @@ export default function Register() {
 
   const isValid = email.trim().length > 3 && password.length >= 6 && confirm === password && accept
 
+  const afterAuth = async () => {
+    const user = auth.currentUser
+    if (!user) return setError('Usuário não autenticado no Firebase.')
+
+    const idToken = await user.getIdToken(true)
+    console.log('Firebase ID Token:', idToken.slice(0, 40) + '...')
+
+    // sanity: backend up?
+    try {
+      const r = await fetch(`${API_URL}/health`)
+      console.log('🌡️ HEALTH CHECK:', r.status, await r.text())
+    } catch (e) {
+      console.error('❌ Falha ao acessar /health:', e)
+      setError('Backend inacessível (CORS ou rede).')
+      return
+    }
+
+    try {
+      // troca pelo JWT curto
+      const { access_token } = await callBackend('/auth/exchange', idToken, { method: 'POST' })
+      console.log('JWT curto do backend:', access_token.slice(0, 40) + '...')
+      localStorage.setItem('mt_jwt', access_token)
+
+      // busca perfil
+      const me = await callBackend('/users/me', access_token)
+      console.log('Perfil retornado do backend:', me)
+      setInfo(`Conta criada! Bem-vindo(a), ${me.name || me.email}`)
+
+      // opcional: navegar
+      // navigate('/')
+    } catch (err) {
+      console.error('❌ Erro na integração com backend:', err)
+      setError('Falha ao comunicar com o backend.')
+    }
+  }
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null); setInfo(null); setLoading(true)
     try {
       await createUserWithEmailAndPassword(auth, email.trim(), password)
-      // Se quiser voltar pro login:
-      // navigate('/login')
-      // Ou deixar o onAuthStateChanged levar pra "/"
-      setInfo('Conta criada com sucesso!')
+      await afterAuth()
     } catch (err) {
       setError(mapFirebaseError((err as any)?.code))
     } finally {
@@ -46,7 +104,7 @@ export default function Register() {
     setError(null); setInfo(null); setLoading(true)
     try {
       await signInWithPopup(auth, googleProvider)
-      // onAuthStateChanged te leva pra "/"
+      await afterAuth()
     } catch (err) {
       setError(mapFirebaseError((err as any)?.code))
     } finally {
@@ -178,7 +236,6 @@ export default function Register() {
               disabled={loading}
               className="w-full rounded-xl py-3 font-semibold bg-white/90 hover:bg-white transition text-slate-900 inline-flex items-center justify-center gap-2"
             >
-              {/* ícone do Google (igual ao Login) */}
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" aria-hidden="true" className="h-5 w-5">
                 <path fill="#FFC107" d="M43.6 20.5H42v-.1H24v7.2h11.3C33.6 31 29.3 34 24 34c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.1-5.1C33.7 5 29.1 3 24 3 16.5 3 9.9 7.1 6.3 14.7z"/>
                 <path fill="#4CAF50" d="M24 43c5.2 0 9.9-2 13.3-5.2l-6.1-5c-2 1.4-4.5 2.2-7.2 2.2-5.3 0-9.7-3.6-11.3-8.5l-6.1 4.7C9.2 38.6 16 43 24 43z"/>
