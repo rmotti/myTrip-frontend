@@ -1,4 +1,3 @@
-import React from 'react'
 
 type QuickActionsProps = {
   onAction?: (key: 'new' | 'expense' | 'map' | 'export') => void
