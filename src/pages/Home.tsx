@@ -8,7 +8,7 @@ import QuickActions from '../components/QuickActions'
 export default function Home({ user }: { user: User }) {
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Top Bar */}
+      {/* Top Bar*/}
       <TopBar
         appName="MyTrip"
         userLabel={user.email ?? user.displayName ?? 'Usuário'}
@@ -18,7 +18,7 @@ export default function Home({ user }: { user: User }) {
       {/* Dashboard */}
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-900">Seu Dashboard</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
           <p className="mt-1 text-slate-600">Resumo rápido das suas viagens</p>
         </div>
 
