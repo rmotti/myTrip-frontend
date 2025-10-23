@@ -3,11 +3,9 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { auth, googleProvider } from '../../firebaseConfig'
 import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail } from 'firebase/auth'
+import { useApi } from '../hooks/useApi'
 
-// ======== CONFIG ========
-const API_URL_RAW = import.meta.env.VITE_API_URL
-const API_URL = (API_URL_RAW || '').replace(/\/$/, '') // remove / final
-console.log("🛰️ API_URL =>", API_URL)
+// ======== API (via hook no componente) ========
 
 // ======== HELPERS ========
 const mapFirebaseError = (code?: string) => {
@@ -22,30 +20,12 @@ const mapFirebaseError = (code?: string) => {
   }
 }
 
-async function callBackend(path: string, token?: string, init?: RequestInit) {
-  const url = `${API_URL}${path}` // path já começa com "/"
-  console.log("📡 FETCH:", url, init?.method || 'GET')
-
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      ...(init?.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      'Content-Type': 'application/json',
-    },
-  })
-
-  if (!res.ok) {
-    const errText = await res.text()
-    throw new Error(`${res.status} ${res.statusText}: ${errText}`)
-  }
-
-  return res.json()
-}
+// callBackend virá do hook dentro do componente
 
 // ======== COMPONENT ========
 export default function Login() {
   const navigate = useNavigate()
+  const { API_URL, callBackend } = useApi()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
