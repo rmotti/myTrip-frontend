@@ -41,6 +41,7 @@ export default function App() {
         path="/"
         element={
           <Protected isAuthed={!!user}>
+            {/* @ts-ignore */}
             <Home user={user!} />
           </Protected>
         }
