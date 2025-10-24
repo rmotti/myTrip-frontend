@@ -1,8 +1,20 @@
 import { useTrips } from "../hooks/useTrips";
-
+import { getAuth, signOut } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 export default function Home() {
-  const { trips, loading} = useTrips();
+  const { trips, loading } = useTrips();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    const auth = getAuth();
+    try {
+      await signOut(auth);
+      navigate("/login"); // volta para a tela de login
+    } catch (error) {
+      console.error("Erro ao sair:", error);
+    }
+  };
 
   return (
     <div className="p-6 bg-[#f0fbff] min-h-screen">
@@ -10,11 +22,20 @@ export default function Home() {
         <h1 className="text-2xl font-bold text-[#0b3b59]">
           MyTrip - Suas Viagens Organizadas
         </h1>
-        <button className="bg-[#0b3b59] text-white rounded-lg px-4 py-2 hover:bg-[#115a84] transition">
-          + Nova Viagem
-        </button>
-      </header>
 
+        <div className="flex gap-3">
+          <button className="bg-[#0b3b59] text-white rounded-lg px-4 py-2 hover:bg-[#115a84] transition">
+            + Nova Viagem
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="bg-red-600 text-white rounded-lg px-4 py-2 hover:bg-red-700 transition"
+          >
+            Sair
+          </button>
+        </div>
+      </header>
 
       {/* Lista de viagens dinâmicas */}
       <section>
@@ -33,17 +54,6 @@ export default function Home() {
                 key={trip.id}
                 className="bg-white rounded-2xl overflow-hidden shadow-md"
               >
-                {/* <img
-                  src={
-                    trip.name.toLowerCase().includes("paris")
-                      ? "/img/paris.jpg"
-                      : trip.name.toLowerCase().includes("rio")
-                      ? "/img/rio.jpg"
-                      : "/img/placeholder.jpg"
-                  }
-                  alt={trip.name}
-                  className="h-48 w-full object-cover"
-                />*/}
                 <div className="p-4">
                   <h3 className="text-lg font-semibold text-[#0b3b59]">
                     {trip.name}
