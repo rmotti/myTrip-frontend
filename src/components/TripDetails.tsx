@@ -1,8 +1,7 @@
 // src/components/TripDetails.tsx
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 import { toast } from 'sonner';
 import NewTripForm, { type TripDraft } from './NewTripForm';
-import type { JSX } from 'react'
 
 import {
   MapPin,
@@ -19,19 +18,6 @@ import {
   ArrowLeft,
   Pencil,
 } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from 'recharts';
 
 type Category = {
   id: string;
@@ -91,8 +77,6 @@ type TripDetailsProps = {
   onClose?: () => void;
 };
 
-const COLORS = ['#3b82f6', '#14b8a6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#ec4899', '#06b6d4'];
-
 export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: TripDetailsProps) {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [spentValue, setSpentValue] = useState('');
@@ -147,15 +131,6 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
     return iconMap[iconName] || <ShoppingBag className="w-5 h-5" />;
   };
 
-  const pieChartData = trip.categories
-    .filter((cat) => cat.spent > 0)
-    .map((cat) => ({ name: cat.name, value: cat.spent }));
-  const barChartData = trip.categories.map((cat) => ({
-    name: cat.name.length > 10 ? cat.name.substring(0, 10) + '...' : cat.name,
-    Planejado: cat.planned,
-    Realizado: cat.spent,
-  }));
-
   return (
     <div className="rounded-xl bg-white shadow-lg">
       {/* Header sticky com título e ações */}
@@ -163,7 +138,10 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-start gap-3">
             {onClose && (
-              <button onClick={onClose} className="mr-1 rounded-md px-2 py-1 hover:bg-gray-100 inline-flex items-center gap-1 text-sm text-gray-700">
+              <button
+                onClick={onClose}
+                className="mr-1 rounded-md px-2 py-1 hover:bg-gray-100 inline-flex items-center gap-1 text-sm text-gray-700"
+              >
                 <ArrowLeft className="w-4 h-4" /> Voltar
               </button>
             )}
@@ -185,12 +163,12 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
               </span>
             </button>
             <button
-            className="px-3 py-1.5 text-sm rounded-md border text-red-600 border-red-200 hover:bg-red-50 inline-flex items-center"
-            onClick={() => {
-              if (window.confirm(`Excluir a viagem \"${trip.name}\"? Essa ação não pode ser desfeita.`)) {
-                onDelete(trip.id);
-              }
-            }}
+              className="px-3 py-1.5 text-sm rounded-md border text-red-600 border-red-200 hover:bg-red-50 inline-flex items-center"
+              onClick={() => {
+                if (window.confirm(`Excluir a viagem "${trip.name}"? Essa ação não pode ser desfeita.`)) {
+                  onDelete(trip.id);
+                }
+              }}
             >
               <Trash2 className="w-4 h-4 mr-1" /> Excluir Viagem
             </button>
@@ -204,7 +182,11 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
           {/* Esquerda: imagem + dados principais */}
           <div className="xl:col-span-2 space-y-4">
             <div className="h-56 md:h-72 overflow-hidden rounded-xl border">
-              <ImageWithFallback src={trip.imageUrl} alt={trip.destination} className="w-full h-full object-cover" />
+              <ImageWithFallback
+                src={trip.imageUrl}
+                alt={trip.destination}
+                className="w-full h-full object-cover"
+              />
             </div>
 
             <div className="rounded-xl border p-4 bg-white">
@@ -215,7 +197,9 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Período</p>
-                    <p className="text-sm">{formatDate(trip.startDate)} até {formatDate(trip.endDate)}</p>
+                    <p className="text-sm">
+                      {formatDate(trip.startDate)} até {formatDate(trip.endDate)}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -250,47 +234,9 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                 </span>
               </div>
               <ProgressBar value={progress} />
-              <p className="text-xs text-center text-gray-600 mt-1">{progress.toFixed(1)}% do orçamento utilizado</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Gráficos lado a lado */}
-        <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="rounded-xl border p-4 bg-white">
-            <p className="text-sm font-medium mb-3">Distribuição de Gastos</p>
-            {pieChartData.length > 0 ? (
-              <div style={{ width: '100%', height: 280 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieChartData} cx="50%" cy="50%" labelLine={false} label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`} outerRadius={90} fill="#8884d8" dataKey="value">
-                      {pieChartData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-gray-400">Nenhum gasto registrado ainda</div>
-            )}
-          </div>
-
-          <div className="rounded-xl border p-4 bg-white">
-            <p className="text-sm font-medium mb-3">Planejado vs. Realizado</p>
-            <div style={{ width: '100%', height: 280 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                  <Legend />
-                  <Bar dataKey="Planejado" fill="#3b82f6" />
-                  <Bar dataKey="Realizado" fill="#14b8a6" />
-                </BarChart>
-              </ResponsiveContainer>
+              <p className="text-xs text-center text-gray-600 mt-1">
+                {progress.toFixed(1)}% do orçamento utilizado
+              </p>
             </div>
           </div>
         </div>
@@ -300,44 +246,68 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
           <p className="text-base font-medium mb-3">Categorias de Gastos</p>
           <div className="space-y-3">
             {trip.categories.map((category) => {
-              const categoryProgress = category.planned > 0 ? (category.spent / category.planned) * 100 : 0;
+              const categoryProgress =
+                category.planned > 0 ? (category.spent / category.planned) * 100 : 0;
               const isOverBudget = category.spent > category.planned;
               return (
                 <div key={category.id} className="p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <div className="bg-blue-100 p-2 rounded">{getCategoryIcon(category.icon)}</div>
+                      <div className="bg-blue-100 p-2 rounded">
+                        {getCategoryIcon(category.icon)}
+                      </div>
                       <div>
                         <h3 className="text-sm font-medium">{category.name}</h3>
-                        <p className="text-xs text-gray-600">{formatCurrency(category.spent)} / {formatCurrency(category.planned)}</p>
+                        <p className="text-xs text-gray-600">
+                          {formatCurrency(category.spent)} / {formatCurrency(category.planned)}
+                        </p>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <button
                         className="px-2.5 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 flex items-center"
-                        onClick={() => { setEditingCategory(category); setIsAddExpenseOpen(true); }}
+                        onClick={() => {
+                          setEditingCategory(category);
+                          setIsAddExpenseOpen(true);
+                        }}
                       >
                         <Plus className="w-4 h-4 mr-1" />
                         Adicionar Gasto
                       </button>
                       <button
                         className="px-2.5 py-1.5 text-sm rounded-md hover:bg-red-50 text-red-600 flex items-center"
-                        onClick={() => { if (window.confirm(`Remover a categoria \"${category.name}\"?`)) { handleRemoveCategory(category.id); } }}
+                        onClick={() => {
+                          if (window.confirm(`Remover a categoria "${category.name}"?`)) {
+                            handleRemoveCategory(category.id);
+                          }
+                        }}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-                  <ProgressBar value={categoryProgress} className={isOverBudget ? 'bg-red-200' : ''} />
+                  <ProgressBar
+                    value={categoryProgress}
+                    className={isOverBudget ? 'bg-red-200' : ''}
+                  />
                   {isOverBudget && (
-                    <p className="text-[11px] text-red-600 mt-1">Acima do orçamento em {formatCurrency(category.spent - category.planned)}</p>
+                    <p className="text-[11px] text-red-600 mt-1">
+                      Acima do orçamento em {formatCurrency(category.spent - category.planned)}
+                    </p>
                   )}
 
                   {isAddExpenseOpen && editingCategory?.id === category.id && (
                     <div className="mt-3 p-3 rounded-md border bg-white">
-                      <div className="text-sm font-medium mb-2">Adicionar Gasto - {category.name}</div>
+                      <div className="text-sm font-medium mb-2">
+                        Adicionar Gasto - {category.name}
+                      </div>
                       <div className="flex items-center gap-2">
-                        <label htmlFor={`spent-${category.id}`} className="text-xs text-gray-600">Valor (R$)</label>
+                        <label
+                          htmlFor={`spent-${category.id}`}
+                          className="text-xs text-gray-600"
+                        >
+                          Valor (R$)
+                        </label>
                         <input
                           id={`spent-${category.id}`}
                           type="number"
@@ -347,8 +317,22 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                           onChange={(e) => setSpentValue(e.target.value)}
                           className="w-32 rounded-md border px-2 py-1 text-sm bg-transparent"
                         />
-                        <button className="px-3 py-1.5 text-sm rounded-md border" onClick={() => { setIsAddExpenseOpen(false); setEditingCategory(null); setSpentValue(''); }}>Cancelar</button>
-                        <button className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600" onClick={handleAddExpense}>Adicionar</button>
+                        <button
+                          className="px-3 py-1.5 text-sm rounded-md border"
+                          onClick={() => {
+                            setIsAddExpenseOpen(false);
+                            setEditingCategory(null);
+                            setSpentValue('');
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600"
+                          onClick={handleAddExpense}
+                        >
+                          Adicionar
+                        </button>
                       </div>
                     </div>
                   )}
@@ -358,6 +342,7 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
           </div>
         </div>
       </div>
+
       {/* Overlay Editar Viagem */}
       {isEditOpen && (() => {
         const initial: TripDraft = {
@@ -367,14 +352,22 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
           endDate: trip.endDate,
           budget: trip.budget,
           imageUrl: trip.imageUrl,
-          categories: trip.categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, planned: c.planned })),
+          categories: trip.categories.map((c) => ({
+            id: c.id,
+            name: c.name,
+            icon: c.icon,
+            planned: c.planned,
+          })),
         };
         return (
           <div
             className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto"
             onClick={() => setIsEditOpen(false)}
           >
-            <div className="my-8 w-full max-w-4xl px-4" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="my-8 w-full max-w-4xl px-4"
+              onClick={(e) => e.stopPropagation()}
+            >
               <NewTripForm
                 title="Editar Viagem"
                 submitLabel="Salvar Alterações"
