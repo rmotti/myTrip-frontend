@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Plane, Hotel, Utensils, Camera, Car, ShoppingBag, Plus } from 'lucide-react';
+import type { JSX } from 'react'
+
 
 export type CategoryDraft = { id: string; name: string; icon: string; planned: number };
 

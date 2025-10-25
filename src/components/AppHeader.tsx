@@ -1,6 +1,6 @@
 // src/components/AppHeader.tsx
 import { useState, type ReactNode } from 'react'
-import { Bell, ChevronLeft, MoreVertical, Search, User } from 'lucide-react'
+import { ChevronLeft, MoreVertical, Search, User } from 'lucide-react'
 
 type NavLink = { label: string; onClick?: () => void; href?: string; active?: boolean }
 type Action = { label: string; onClick: () => void; icon?: ReactNode; variant?: 'primary' | 'outline' | 'ghost' }

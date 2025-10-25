@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import NewTripForm, { type TripDraft } from './NewTripForm';
+import type { JSX } from 'react'
+
 import {
   MapPin,
   Calendar,
