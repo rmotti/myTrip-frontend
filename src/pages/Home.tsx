@@ -18,8 +18,19 @@ type ApiTrip = {
   start_date: string;     // ex: "2025-02-10"
   end_date: string;       // ex: "2025-02-20"
   total_budget?: number | null;
-  // se houver categorias/gastos no backend, adicione aqui
 };
+
+// --- NOVO: tipo do hook (mesma estrutura, mas id number) ------------------ //
+// Se seu hook já exporta um tipo, use-o. Aqui só inferimos que o id é number.
+type HookTrip = Omit<ApiTrip, "id"> & { id: number }; // <<<
+
+// --- NOVO: normalizador do retorno do hook para ApiTrip ------------------- //
+function toApiTripFromHook(t: HookTrip): ApiTrip { // <<<
+  return {
+    ...t,
+    id: String(t.id),
+  };
+}
 
 // TIPOS esperados pelo TripCard (ajuste o import do type se existir em outro lugar)
 type TripCardType = {
@@ -51,8 +62,6 @@ function mapToTripCard(t: ApiTrip): TripCardType {
     startDate: t.start_date,
     endDate: t.end_date,
     budget: t.total_budget ?? 0,
-    // Se não houver categorias no backend ainda, passamos vazio.
-    // Quando você tiver as categorias, popule aqui (planned/spent por categoria).
     categories: [],
   };
 }
@@ -63,6 +72,9 @@ export default function Home() {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
+
+  // --- NOVO: normalizamos UMA VEZ a lista vinda do hook ------------------- //
+  const apiTrips: ApiTrip[] = (trips as unknown as HookTrip[]).map(toApiTripFromHook); // <<<
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -103,12 +115,12 @@ export default function Home() {
 
         {loading ? (
           <p className="text-gray-500">Carregando viagens...</p>
-        ) : trips.length === 0 ? (
+        ) : apiTrips.length === 0 ? ( // <<< usar lista normalizada
           <p className="text-gray-500">Nenhuma viagem cadastrada.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {trips
-              .map((t: ApiTrip) => mapToTripCard(t))
+            {apiTrips
+              .map(mapToTripCard) // <<< sem anotar param como ApiTrip; o TS infere
               .filter((trip) => {
                 const q = search.trim().toLowerCase();
                 if (!q) return true;
@@ -159,9 +171,11 @@ export default function Home() {
           </div>
         )}
       </section>
+
       {/* Overlay Trip Details */}
       {selectedTripId && (() => {
-        const api = trips.find((t: ApiTrip) => t.id === selectedTripId);
+        // --- usar a lista normalizada aqui também ------------------------- //
+        const api = apiTrips.find(t => t.id === selectedTripId); // <<<
         if (!api) return null;
         const selected = mapToTripCard(api);
         return (
@@ -185,6 +199,7 @@ export default function Home() {
           </div>
         );
       })()}
+
       {/* Overlay Criar Viagem */}
       {isCreateOpen && (
         <div
