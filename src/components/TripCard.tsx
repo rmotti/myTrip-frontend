@@ -25,7 +25,7 @@ import { MapPin, Calendar, DollarSign, Trash2 } from 'lucide-react';
 
 // Removido shadcn/ui e Radix wrappers (não existem no projeto)
 
-import { toast } from 'sonner';
+
 
 
 type TripCardProps = {
@@ -35,7 +35,7 @@ type TripCardProps = {
   onOpenDetails?: (tripId: string) => void; // opcional
 };
 
-const COLORS = ['#3b82f6', '#14b8a6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#ec4899', '#06b6d4'];
+
 
 // Barra de progresso simples com Tailwind
 function ProgressBar({ value, className }: { value: number; className?: string }) {
@@ -71,10 +71,8 @@ function ImageWithFallback({ src, alt, className }: { src: string; alt: string; 
   );
 }
 
-export function TripCard({ trip, onUpdateTrip, onDelete, onOpenDetails }: TripCardProps) {
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [spentValue, setSpentValue] = useState('');
-  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+export function TripCard({ trip,onDelete, onOpenDetails }: TripCardProps) {
+
 
   const totalPlanned = trip.categories.reduce((sum, cat) => sum + cat.planned, 0);
   const totalSpent = trip.categories.reduce((sum, cat) => sum + cat.spent, 0);
@@ -87,31 +85,9 @@ export function TripCard({ trip, onUpdateTrip, onDelete, onOpenDetails }: TripCa
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  const handleAddExpense = () => {
-    if (!editingCategory || !spentValue) {
-      toast.error('Preencha o valor do gasto');
-      return;
-    }
-    const value = parseFloat(spentValue);
-    if (isNaN(value) || value < 0) {
-      toast.error('Digite um valor válido');
-      return;
-    }
-    const updatedCategories = trip.categories.map((cat) =>
-      cat.id === editingCategory.id ? { ...cat, spent: cat.spent + value } : cat
-    );
-    onUpdateTrip({ ...trip, categories: updatedCategories });
-    setSpentValue('');
-    setEditingCategory(null);
-    setIsAddExpenseOpen(false);
-    toast.success('Gasto adicionado com sucesso');
-  };
+ 
 
-  const handleRemoveCategory = (categoryId: string) => {
-    const updatedCategories = trip.categories.filter((cat) => cat.id !== categoryId);
-    onUpdateTrip({ ...trip, categories: updatedCategories });
-    toast.success('Categoria removida');
-  };
+
 
   // Neste card compacto não mostramos ícones de categorias nem gráficos
 
