@@ -1,7 +1,7 @@
 // src/components/TripDetails.tsx
 import { useState, type JSX } from 'react';
 import { toast } from 'sonner';
-import NewTripForm, { type TripDraft } from './NewTripForm';
+import EditTripForm from './EditTripForm';
 
 import {
   MapPin,
@@ -344,64 +344,32 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
       </div>
 
       {/* Overlay Editar Viagem */}
-      {isEditOpen && (() => {
-        const initial: TripDraft = {
-          name: trip.name,
-          destination: trip.destination,
-          startDate: trip.startDate,
-          endDate: trip.endDate,
-          budget: trip.budget,
-          imageUrl: trip.imageUrl,
-          categories: trip.categories.map((c) => ({
-            id: c.id,
-            name: c.name,
-            icon: c.icon,
-            planned: c.planned,
-          })),
-        };
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto"
-            onClick={() => setIsEditOpen(false)}
-          >
-            <div
-              className="my-8 w-full max-w-4xl px-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <NewTripForm
-                title="Editar Viagem"
-                submitLabel="Salvar Alterações"
-                initial={initial}
-                onCancel={() => setIsEditOpen(false)}
-                onSubmit={(draft) => {
-                  const updated = {
-                    ...trip,
-                    name: draft.name,
-                    destination: draft.destination,
-                    startDate: draft.startDate,
-                    endDate: draft.endDate,
-                    budget: draft.budget,
-                    imageUrl: draft.imageUrl || trip.imageUrl,
-                    categories: draft.categories.map((d) => {
-                      const existing = trip.categories.find((c) => c.id === d.id);
-                      return {
-                        id: existing?.id || d.id,
-                        name: d.name,
-                        icon: d.icon,
-                        planned: d.planned,
-                        spent: existing?.spent ?? 0,
-                      };
-                    }),
-                  } as Trip;
-                  onUpdateTrip(updated);
-                  setIsEditOpen(false);
-                  toast.success('Viagem atualizada');
-                }}
-              />
-            </div>
+      {isEditOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto"
+          onClick={() => setIsEditOpen(false)}
+        >
+          <div className="my-8 w-full max-w-4xl px-4" onClick={(e) => e.stopPropagation()}>
+            <EditTripForm
+              tripId={trip.id}
+              initial={{
+                name: trip.name,
+                destination: trip.destination,
+                start_date: trip.startDate,
+                end_date: trip.endDate,
+                currency_code: 'BRL',
+                total_budget: trip.budget,
+                image_url: trip.imageUrl ?? '',
+              }}
+              onUpdated={() => {
+                setIsEditOpen(false)
+                toast.success('Viagem atualizada')
+              }}
+              onCancel={() => setIsEditOpen(false)}
+            />
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import TripDetails from "../components/TripDetails";
 import NewTripForm from "../components/NewTripForm";
 import AppHeader from "../components/AppHeader";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 // TIPOS do backend (exemplo; ajuste se já tiver types prontos)
 type ApiTrip = {
@@ -21,18 +22,14 @@ type ApiTrip = {
 };
 
 // --- NOVO: tipo do hook (mesma estrutura, mas id number) ------------------ //
-// Se seu hook já exporta um tipo, use-o. Aqui só inferimos que o id é number.
-type HookTrip = Omit<ApiTrip, "id"> & { id: number }; // <<<
+type HookTrip = Omit<ApiTrip, "id"> & { id: number };
 
 // --- NOVO: normalizador do retorno do hook para ApiTrip ------------------- //
-function toApiTripFromHook(t: HookTrip): ApiTrip { // <<<
-  return {
-    ...t,
-    id: String(t.id),
-  };
+function toApiTripFromHook(t: HookTrip): ApiTrip {
+  return { ...t, id: String(t.id) };
 }
 
-// TIPOS esperados pelo TripCard (ajuste o import do type se existir em outro lugar)
+// TIPOS esperados pelo TripCard
 type TripCardType = {
   id: string;
   name: string;
@@ -67,14 +64,14 @@ function mapToTripCard(t: ApiTrip): TripCardType {
 }
 
 export default function Home() {
-  const { trips, loading /*, updateTrip, deleteTrip*/ } = useTrips();
+  const { trips, loading, createTrip, updateTrip, deleteTrip } = useTrips();
   const navigate = useNavigate();
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  // --- NOVO: normalizamos UMA VEZ a lista vinda do hook ------------------- //
-  const apiTrips: ApiTrip[] = (trips as unknown as HookTrip[]).map(toApiTripFromHook); // <<<
+  // normaliza a lista vinda do hook (id number -> string)
+  const apiTrips: ApiTrip[] = (trips as unknown as HookTrip[]).map(toApiTripFromHook);
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -115,22 +112,20 @@ export default function Home() {
 
         {loading ? (
           <p className="text-gray-500">Carregando viagens...</p>
-        ) : apiTrips.length === 0 ? ( // <<< usar lista normalizada
+        ) : apiTrips.length === 0 ? (
           <p className="text-gray-500">Nenhuma viagem cadastrada.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {apiTrips
-              .map(mapToTripCard) // <<< sem anotar param como ApiTrip; o TS infere
+              .map(mapToTripCard)
               .filter((trip) => {
                 const q = search.trim().toLowerCase();
                 if (!q) return true;
 
-                // Nome e destino
                 const byText =
                   trip.name.toLowerCase().includes(q) ||
                   trip.destination.toLowerCase().includes(q);
 
-                // Datas (várias representações)
                 const startRaw = trip.startDate.toLowerCase();
                 const endRaw = trip.endDate.toLowerCase();
                 const startBR = new Date(trip.startDate).toLocaleDateString('pt-BR');
@@ -145,7 +140,6 @@ export default function Home() {
                   startLong.includes(q) ||
                   endLong.includes(q);
 
-                // Orçamento (numérico e moeda)
                 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
                   .format(trip.budget)
                   .toLowerCase();
@@ -159,11 +153,30 @@ export default function Home() {
                 <TripCard
                   key={trip.id}
                   trip={trip}
-                  onUpdateTrip={(updated) => {
-                    console.log("Atualizar (implementar no hook):", updated);
+                  onUpdateTrip={async (frontTrip) => {
+                    try {
+                      await updateTrip(Number(frontTrip.id), {
+                        name: frontTrip.name,
+                        start_date: frontTrip.startDate,
+                        end_date: frontTrip.endDate,
+                        total_budget: frontTrip.budget,
+                        // currency_code: 'BRL', // inclua se quiser permitir troca de moeda
+                      } as any);
+                      toast.success("Viagem atualizada");
+                    } catch (e) {
+                      console.error(e);
+                      toast.error("Falha ao atualizar viagem");
+                    }
                   }}
-                  onDelete={(id) => {
-                    console.log("Excluir (implementar no hook):", id);
+                  onDelete={async (id) => {
+                    try {
+                      await deleteTrip(Number(id));
+                      toast.success("Viagem excluída");
+                      setSelectedTripId(null);
+                    } catch (e) {
+                      console.error(e);
+                      toast.error("Falha ao excluir viagem");
+                    }
                   }}
                   onOpenDetails={(id) => setSelectedTripId(id)}
                 />
@@ -174,8 +187,7 @@ export default function Home() {
 
       {/* Overlay Trip Details */}
       {selectedTripId && (() => {
-        // --- usar a lista normalizada aqui também ------------------------- //
-        const api = apiTrips.find(t => t.id === selectedTripId); // <<<
+        const api = apiTrips.find(t => t.id === selectedTripId);
         if (!api) return null;
         const selected = mapToTripCard(api);
         return (
@@ -186,12 +198,29 @@ export default function Home() {
             <div className="my-8 w-full max-w-6xl px-4" onClick={(e) => e.stopPropagation()}>
               <TripDetails
                 trip={selected}
-                onUpdateTrip={(updated) => {
-                  console.log("Atualizar (implementar no hook):", updated);
+                onUpdateTrip={async (frontTrip) => {
+                  try {
+                    await updateTrip(Number(frontTrip.id), {
+                      name: frontTrip.name,
+                      start_date: frontTrip.startDate,
+                      end_date: frontTrip.endDate,
+                      total_budget: frontTrip.budget,
+                    } as any);
+                    toast.success("Viagem atualizada");
+                  } catch (e) {
+                    console.error(e);
+                    toast.error("Falha ao atualizar viagem");
+                  }
                 }}
-                onDelete={(id) => {
-                  console.log("Excluir (implementar no hook):", id);
-                  setSelectedTripId(null);
+                onDelete={async (id) => {
+                  try {
+                    await deleteTrip(Number(id));
+                    toast.success("Viagem excluída");
+                    setSelectedTripId(null);
+                  } catch (e) {
+                    console.error(e);
+                    toast.error("Falha ao excluir viagem");
+                  }
                 }}
                 onClose={() => setSelectedTripId(null)}
               />
@@ -207,13 +236,7 @@ export default function Home() {
           onClick={() => setIsCreateOpen(false)}
         >
           <div className="my-8 w-full max-w-4xl px-4" onClick={(e) => e.stopPropagation()}>
-            <NewTripForm
-              onCancel={() => setIsCreateOpen(false)}
-              onCreate={(draft) => {
-                console.log("Criar Viagem (implementar POST):", draft);
-                setIsCreateOpen(false);
-              }}
-            />
+            <NewTripForm onCancel={() => setIsCreateOpen(false)} onCreated={() => setIsCreateOpen(false)} />
           </div>
         </div>
       )}
