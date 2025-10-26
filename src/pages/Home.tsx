@@ -64,7 +64,7 @@ function mapToTripCard(t: ApiTrip): TripCardType {
 }
 
 export default function Home() {
-  const { trips, loading, createTrip, updateTrip, deleteTrip } = useTrips();
+  const { trips, loading, updateTrip, deleteTrip } = useTrips();
   const navigate = useNavigate();
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);

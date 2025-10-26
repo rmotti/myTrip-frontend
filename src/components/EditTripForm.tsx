@@ -44,6 +44,9 @@ type EditTripFormProps = {
   onCancel: () => void
 }
 
+const toId = (v: number | string) =>
+  typeof v === 'string' ? Number(v) : v
+
 export default function EditTripForm({ tripId, initial, onUpdated, onCancel }: EditTripFormProps) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const form = useForm<FormValues>({
@@ -54,16 +57,22 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel }: E
   const startDate = form.watch('start_date')
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const payload = {
+    const payload: FormValues = {
       ...values,
       currency_code: values.currency_code.toUpperCase(),
     }
+
+    const id = toId(tripId)
+    if (!Number.isFinite(id)) {
+      toast.error('ID da viagem inválido.')
+      return
+    }
+
     await toast.promise(
-      updateTrip(tripId, payload as any),
+      updateTrip(id as number, payload as any),
       {
         loading: 'Atualizando...',
-        success: 'Viagem atualizada!'
-        ,
+        success: 'Viagem atualizada!',
         error: (err) => getErrorMessage(err, 'Falha ao atualizar viagem'),
       }
     )
@@ -98,7 +107,14 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel }: E
 
         <div>
           <label className="block text-sm text-gray-600 mb-1">Orçamento Total (R$) *</label>
-          <input type="number" step="0.01" min={0} className="w-full rounded-md border px-3 py-2" placeholder="0.00" {...form.register('total_budget')} />
+          <input
+            type="number"
+            step="0.01"
+            min={0}
+            className="w-full rounded-md border px-3 py-2"
+            placeholder="0.00"
+            {...form.register('total_budget')}
+          />
           {form.formState.errors.total_budget && (<p className="text-sm text-red-500">{form.formState.errors.total_budget.message}</p>)}
         </div>
         <div>
@@ -116,9 +132,14 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel }: E
 
       <div className="mt-6 flex justify-end gap-3">
         <button onClick={onCancel} className="rounded-md border px-4 py-2 text-sm hover:bg-gray-50">Cancelar</button>
-        <button onClick={onSubmit} disabled={!form.formState.isValid || form.formState.isSubmitting} className="rounded-md bg-blue-600 text-white px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Salvar</button>
+        <button
+          onClick={onSubmit}
+          disabled={!form.formState.isValid || form.formState.isSubmitting}
+          className="rounded-md bg-blue-600 text-white px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Salvar
+        </button>
       </div>
     </div>
   )
 }
-
