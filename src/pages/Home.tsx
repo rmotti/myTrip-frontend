@@ -1,4 +1,4 @@
-// src/pages/Home.tsx
+﻿// src/pages/Home.tsx
 import { useTrips } from "../hooks/useTrips";
 import { useState } from "react";
 import { getAuth, signOut } from "firebase/auth";
@@ -9,8 +9,10 @@ import NewTripForm from "../components/NewTripForm";
 import AppHeader from "../components/AppHeader";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useMemo } from 'react'
+import { useTripsBudget } from '@/hooks/useTripsBudget'
 
-// TIPOS do backend (exemplo; ajuste se já tiver types prontos)
+// TIPOS do backend (exemplo; ajuste se jÃ¡ tiver types prontos)
 type ApiTrip = {
   id: string;
   name: string;
@@ -26,7 +28,10 @@ type HookTrip = Omit<ApiTrip, "id"> & { id: number };
 
 // --- NOVO: normalizador do retorno do hook para ApiTrip ------------------- //
 function toApiTripFromHook(t: HookTrip): ApiTrip {
-  return { ...t, id: String(t.id) };
+  return {
+    ...t,
+    id: String(t.id),
+  };
 }
 
 // TIPOS esperados pelo TripCard
@@ -64,7 +69,7 @@ function mapToTripCard(t: ApiTrip): TripCardType {
 }
 
 export default function Home() {
-  const { trips, loading, updateTrip, deleteTrip } = useTrips();
+  const { trips, loading, updateTrip, deleteTrip, refetch } = useTrips();
   const navigate = useNavigate();
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -72,6 +77,34 @@ export default function Home() {
 
   // normaliza a lista vinda do hook (id number -> string)
   const apiTrips: ApiTrip[] = (trips as unknown as HookTrip[]).map(toApiTripFromHook);
+  const tripIds = useMemo(() => (trips || []).map((t: any) => Number(t.id)).filter((n: number) => Number.isFinite(n)), [trips])
+  const budgets = useTripsBudget(tripIds)
+
+  // Ouvir pedidos de refresh vindos do overlay (TripDetails)
+  // para atualizar os cards do dashboard e sinalizar conclusÃ£o.
+  // NÃ£o cria dependÃªncias para evitar re-registro em cada render.
+  if (typeof window !== 'undefined' && !(window as any).__budgetRefreshListener) {
+    (window as any).__budgetRefreshListener = true
+    window.addEventListener('dashboard:refresh', async () => {
+      try {
+        await budgets.refetch()
+      } finally {
+        window.dispatchEvent(new CustomEvent('dashboard:refresh:done'))
+      }
+    })
+  }
+
+  // Ouve eventos de refresh de trips (ediÃ§Ã£o/criaÃ§Ã£o)
+  if (typeof window !== 'undefined' && !(window as any).__tripsRefreshListener) {
+    (window as any).__tripsRefreshListener = true
+    window.addEventListener('trips:refresh', async () => {
+      try {
+        await (refetch?.() ?? Promise.resolve())
+      } catch {
+        /* ignore */
+      }
+    })
+  }
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -149,10 +182,13 @@ export default function Home() {
 
                 return byText || byDate || byBudget;
               })
-              .map((trip) => (
+              .map((trip) => {
+                const cat = budgets.byTrip[Number(trip.id)]
+                const withCats = cat ? { ...trip, categories: cat.map((c) => ({ id: String(c.id), name: c.name, icon: c.icon, planned: c.planned, spent: c.spent })) } : trip
+                return (
                 <TripCard
                   key={trip.id}
-                  trip={trip}
+                  trip={withCats}
                   onUpdateTrip={async (frontTrip) => {
                     try {
                       await updateTrip(Number(frontTrip.id), {
@@ -171,7 +207,7 @@ export default function Home() {
                   onDelete={async (id) => {
                     try {
                       await deleteTrip(Number(id));
-                      toast.success("Viagem excluída");
+                      toast.success("Viagem excluÃ­da");
                       setSelectedTripId(null);
                     } catch (e) {
                       console.error(e);
@@ -180,7 +216,8 @@ export default function Home() {
                   }}
                   onOpenDetails={(id) => setSelectedTripId(id)}
                 />
-              ))}
+                )
+              })}
           </div>
         )}
       </section>
@@ -198,28 +235,22 @@ export default function Home() {
             <div className="my-8 w-full max-w-6xl px-4" onClick={(e) => e.stopPropagation()}>
               <TripDetails
                 trip={selected}
-                onUpdateTrip={async (frontTrip) => {
-                  try {
-                    await updateTrip(Number(frontTrip.id), {
-                      name: frontTrip.name,
-                      start_date: frontTrip.startDate,
-                      end_date: frontTrip.endDate,
-                      total_budget: frontTrip.budget,
-                    } as any);
-                    toast.success("Viagem atualizada");
-                  } catch (e) {
-                    console.error(e);
-                    toast.error("Falha ao atualizar viagem");
-                  }
-                }}
                 onDelete={async (id) => {
                   try {
                     await deleteTrip(Number(id));
-                    toast.success("Viagem excluída");
+                    toast.success("Viagem excluÃ­da");
                     setSelectedTripId(null);
                   } catch (e) {
                     console.error(e);
                     toast.error("Falha ao excluir viagem");
+                  }
+                }}
+                onUpdateTrip={async (id, payload) => {
+                  try {
+                    await updateTrip(Number(id), payload as any)
+                  } catch (e) {
+                    console.error(e)
+                    throw e
                   }
                 }}
                 onClose={() => setSelectedTripId(null)}

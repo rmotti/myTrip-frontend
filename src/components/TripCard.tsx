@@ -1,5 +1,6 @@
 // src/components/TripCard.tsx
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useBudget } from '@/hooks/useBudget';
 
 // Tipos locais (compatíveis com o que Home.tsx envia)
 type Category = {
@@ -72,10 +73,25 @@ function ImageWithFallback({ src, alt, className }: { src: string; alt: string; 
 }
 
 export function TripCard({ trip,onDelete, onOpenDetails }: TripCardProps) {
+  const tripIdNum = useMemo(() => Number(trip.id), [trip.id])
+  const budget = useBudget(tripIdNum)
 
+  const categoriesFromBudget = useMemo(() => (
+    budget.categories.map((c) => ({
+      id: String(c.id),
+      name: c.name,
+      icon: c.icon,
+      planned: c.planned,
+      spent: c.spent,
+    }))
+  ), [budget.categories])
 
-  const totalPlanned = trip.categories.reduce((sum, cat) => sum + cat.planned, 0);
-  const totalSpent = trip.categories.reduce((sum, cat) => sum + cat.spent, 0);
+  const categories = (trip.categories && trip.categories.length > 0)
+    ? trip.categories
+    : categoriesFromBudget
+
+  const totalPlanned = categories.reduce((sum, cat) => sum + cat.planned, 0);
+  const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
   const progress = totalPlanned > 0 ? (totalSpent / totalPlanned) * 100 : 0;
   const remaining = totalPlanned - totalSpent;
 
@@ -95,7 +111,7 @@ export function TripCard({ trip,onDelete, onOpenDetails }: TripCardProps) {
 
   return (
     <div
-      className="overflow-hidden shadow-lg hover:shadow-xl transition rounded-xl bg-white border border-gray-200 cursor-pointer"
+      className="group overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-200 rounded-xl bg-white border border-gray-200 hover:border-slate-300 hover:ring-1 hover:ring-blue-100 cursor-pointer hover:-translate-y-1"
       onClick={openDetails}
       role={onOpenDetails ? 'button' : undefined}
       tabIndex={onOpenDetails ? 0 : -1}
@@ -105,7 +121,7 @@ export function TripCard({ trip,onDelete, onOpenDetails }: TripCardProps) {
         <ImageWithFallback
           src={trip.imageUrl}
           alt={trip.destination}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
         />
       </div>
 

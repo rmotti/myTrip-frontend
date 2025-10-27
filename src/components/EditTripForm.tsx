@@ -42,12 +42,13 @@ type EditTripFormProps = {
   initial: FormValues
   onUpdated?: () => void
   onCancel: () => void
+  onSubmit?: (values: FormValues) => Promise<unknown> | unknown
 }
 
 const toId = (v: number | string) =>
   typeof v === 'string' ? Number(v) : v
 
-export default function EditTripForm({ tripId, initial, onUpdated, onCancel }: EditTripFormProps) {
+export default function EditTripForm({ tripId, initial, onUpdated, onCancel, onSubmit: _onSubmitProp }: EditTripFormProps) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const form = useForm<FormValues>({
     resolver: zodResolver(tripSchema),
@@ -57,9 +58,14 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel }: E
   const startDate = form.watch('start_date')
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const payload: FormValues = {
-      ...values,
+    const payload = {
+      name: values.name,
+      destination: values.destination,
+      start_date: values.start_date,
+      end_date: values.end_date,
       currency_code: values.currency_code.toUpperCase(),
+      total_budget: values.total_budget,
+      image_url: values.image_url,
     }
 
     const id = toId(tripId)
@@ -76,6 +82,7 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel }: E
         error: (err) => getErrorMessage(err, 'Falha ao atualizar viagem'),
       }
     )
+    try { window.dispatchEvent(new CustomEvent('trips:refresh')) } catch {}
     onUpdated?.()
   })
 

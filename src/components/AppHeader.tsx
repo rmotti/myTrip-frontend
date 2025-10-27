@@ -1,6 +1,6 @@
 // src/components/AppHeader.tsx
 import { useState, type ReactNode } from 'react'
-import { ChevronLeft, MoreVertical, Search, User } from 'lucide-react'
+import { ChevronLeft, Search, User } from 'lucide-react'
 
 type NavLink = { label: string; onClick?: () => void; href?: string; active?: boolean }
 type Action = { label: string; onClick: () => void; icon?: ReactNode; variant?: 'primary' | 'outline' | 'ghost' }
@@ -168,9 +168,6 @@ export default function AppHeader({
             </div>
 
             <div className="flex items-center gap-2">
-              <button className="p-1.5 rounded hover:bg-white/10">
-                <MoreVertical className="w-5 h-5" />
-              </button>
               {primaryAction && (
                 <button
                   onClick={primaryAction.onClick}

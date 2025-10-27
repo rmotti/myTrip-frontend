@@ -99,12 +99,17 @@ export default function NewTripForm({ onCreated, onCancel, title, submitLabel, i
 
   const onSubmit = form.handleSubmit(async (values) => {
     const payload = {
-      ...values,
+      name: values.name,
+      destination: values.destination,
+      start_date: values.start_date,
+      end_date: values.end_date,
       currency_code: values.currency_code.toUpperCase(),
+      total_budget: values.total_budget,
+      image_url: values.image_url,
     }
     if (onSubmitProp) {
       // Delega para o pai, mas envolve com toast.promise para UX consistente
-      await toast.promise(Promise.resolve(onSubmitProp(payload as FormValues)), {
+      await toast.promise(Promise.resolve(onSubmitProp(values)), {
         loading: 'Criando viagem...',
         success: 'Viagem criada!',
         error: (err) => getErrorMessage(err, 'Falha ao criar viagem'),
@@ -116,6 +121,7 @@ export default function NewTripForm({ onCreated, onCancel, title, submitLabel, i
         error: (err) => getErrorMessage(err, 'Falha ao criar viagem'),
       })
     }
+    try { window.dispatchEvent(new CustomEvent('trips:refresh')) } catch {}
     onCreated?.()
   })
 

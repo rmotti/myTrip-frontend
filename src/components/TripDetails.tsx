@@ -1,7 +1,9 @@
-// src/components/TripDetails.tsx
-import { useState, type JSX } from 'react';
+﻿// src/components/TripDetails.tsx
+import { useState, type JSX, useMemo } from 'react';
 import { toast } from 'sonner';
 import EditTripForm from './EditTripForm';
+import { useBudget } from '@/hooks/useBudget';
+import { getErrorMessage } from '@/utils/getErrorMessage';
 
 import {
   MapPin,
@@ -19,12 +21,51 @@ import {
   Pencil,
 } from 'lucide-react';
 
+function SaveDashboardButton({ onClose }: { onClose?: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const waitDone = () =>
+    new Promise<void>((resolve) => {
+      const handler = () => {
+        window.removeEventListener('dashboard:refresh:done', handler)
+        resolve()
+      }
+      window.addEventListener('dashboard:refresh:done', handler, { once: true })
+      setTimeout(() => {
+        try { window.removeEventListener('dashboard:refresh:done', handler) } catch {}
+        resolve()
+      }, 6000)
+    })
+
+  return (
+    <button
+      className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600 hover:opacity-90 inline-flex items-center gap-2 disabled:opacity-50"
+      disabled={saving}
+      onClick={async () => {
+        setSaving(true)
+        try {
+          window.dispatchEvent(new CustomEvent('dashboard:refresh'))
+          onClose?.()
+          await waitDone()
+        } finally {
+          setSaving(false)
+        }
+      }}
+    >
+      {saving && (
+        <span className="inline-block h-4 w-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
+      )}
+      Salvar
+    </button>
+  )
+}
+
 type Category = {
-  id: string;
+  id: number;
   name: string;
   icon: string;
   planned: number;
   spent: number;
+  hasTarget: boolean;
 };
 
 type Trip = {
@@ -35,7 +76,6 @@ type Trip = {
   startDate: string;
   endDate: string;
   budget: number;
-  categories: Category[];
 };
 
 function ProgressBar({ value, className }: { value: number; className?: string }) {
@@ -72,51 +112,108 @@ function ImageWithFallback({ src, alt, className }: { src: string; alt: string; 
 
 type TripDetailsProps = {
   trip: Trip;
-  onUpdateTrip: (trip: Trip) => void;
   onDelete: (tripId: string) => void;
   onClose?: () => void;
+  onUpdateTrip?: (tripId: string, payload: any) => Promise<void> | void;
 };
 
-export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: TripDetailsProps) {
+export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: TripDetailsProps) {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [spentValue, setSpentValue] = useState('');
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingTargetId, setEditingTargetId] = useState<number | null>(null);
+  const [targetValue, setTargetValue] = useState('');
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
+  const [newCategoryPlanned, setNewCategoryPlanned] = useState('');
+  const [expandedCategoryId, setExpandedCategoryId] = useState<number | null>(null);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [newCategoryIsOther, setNewCategoryIsOther] = useState(false);
+  const [newCategoryOtherName, setNewCategoryOtherName] = useState('');
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editItemTitle, setEditItemTitle] = useState('');
+  const [editItemDate, setEditItemDate] = useState('');
+  const [editItemAmount, setEditItemAmount] = useState('');
 
-  const totalPlanned = trip.categories.reduce((sum, cat) => sum + cat.planned, 0);
-  const totalSpent = trip.categories.reduce((sum, cat) => sum + cat.spent, 0);
+  const tripIdNum = useMemo(() => Number(trip.id), [trip.id])
+  const budget = useBudget(tripIdNum)
+
+  const displayCatName = (c: any): string => {
+    const n = c?.name ?? c?.title ?? c?.label ?? c?.display_name ?? c?.slug ?? c?.code
+    return n ? String(n) : `Categoria ${c?.id ?? ''}`
+  }
+  const otherSeed = useMemo(() => {
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+    const keys = ['outro', 'outros', 'other', 'misc', 'diversos', 'variados', 'uncategorized']
+    return budget.raw.categories.find((c) => keys.includes(norm(displayCatName(c))))
+  }, [budget.raw.categories])
+
+  const totalPlanned = budget.categories.reduce((sum, cat) => sum + cat.planned, 0);
+  const totalSpent = budget.categories.reduce((sum, cat) => sum + cat.spent, 0);
   const progress = totalPlanned > 0 ? (totalSpent / totalPlanned) * 100 : 0;
   const remaining = totalPlanned - totalSpent;
 
+  // From:
+  // "PerÃ­odo" -> "Período"
+  // "OrÃ§amento" -> "Orçamento"
+  // "TÃ­tulo" -> "Título"
+  // "aÃ§Ã£o" -> "ação"
+  // "ConteÃºdo" -> "Conteúdo"
+
+  // These issues seem to be encoding-related (UTF-8 encoding). You should ensure your editor is configured to use UTF-8 encoding to properly handle accented characters.
+
+  // The original placeholder code was correct and doesn't need changes:
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  const handleAddExpense = () => {
+  const handleAddExpense = async () => {
     if (!editingCategory || !spentValue) {
       toast.error('Preencha o valor do gasto');
       return;
     }
     const value = parseFloat(spentValue);
-    if (isNaN(value) || value < 0) {
-      toast.error('Digite um valor válido');
+    if (isNaN(value) || value <= 0) {
+      toast.error('Digite um valor vÃ¡lido');
       return;
     }
-    const updatedCategories = trip.categories.map((cat) =>
-      cat.id === editingCategory.id ? { ...cat, spent: cat.spent + value } : cat
-    );
-    onUpdateTrip({ ...trip, categories: updatedCategories });
-    setSpentValue('');
-    setEditingCategory(null);
-    setIsAddExpenseOpen(false);
-    toast.success('Gasto adicionado com sucesso');
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const start = trip.startDate
+      const end = trip.endDate
+      const clamp = (d: string) => {
+        if (start && d < start) return start
+        if (end && d > end) return end
+        return d
+      }
+      const dateToUse = clamp(today)
+      await toast.promise(
+        budget.addExpense(editingCategory.id, value, { title: `Gasto - ${editingCategory.name}`, date: dateToUse }),
+        {
+          loading: 'Adicionando gasto...',
+          success: 'Gasto adicionado com sucesso',
+          error: (e) => getErrorMessage(e, 'Falha ao adicionar gasto'),
+        }
+      )
+      setSpentValue('');
+      setEditingCategory(null);
+      setIsAddExpenseOpen(false);
+    } catch {/* handled by toast */}
   };
 
-  const handleRemoveCategory = (categoryId: string) => {
-    const updatedCategories = trip.categories.filter((cat) => cat.id !== categoryId);
-    onUpdateTrip({ ...trip, categories: updatedCategories });
-    toast.success('Categoria removida');
+  const handleRemoveCategory = async (categoryId: number) => {
+    try {
+      await toast.promise(
+        budget.removeCategoryTarget(categoryId),
+        {
+          loading: 'Removendo categoria...',
+          success: 'Categoria removida',
+          error: (e) => getErrorMessage(e, 'Falha ao remover categoria'),
+        }
+      )
+    } catch {/* handled by toast */}
   };
 
   const getCategoryIcon = (iconName: string) => {
@@ -133,7 +230,7 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
 
   return (
     <div className="rounded-xl bg-white shadow-lg">
-      {/* Header sticky com título e ações */}
+      {/* Header sticky com tÃ­tulo e aÃ§Ãµes */}
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b rounded-t-xl">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-start gap-3">
@@ -153,19 +250,11 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              className="px-3 py-1.5 text-sm rounded-md border text-slate-800 border-slate-200 hover:bg-slate-50"
-              onClick={() => setIsEditOpen(true)}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Pencil className="w-4 h-4" />
-                Editar
-              </span>
-            </button>
+            <SaveDashboardButton onClose={onClose} />
             <button
               className="px-3 py-1.5 text-sm rounded-md border text-red-600 border-red-200 hover:bg-red-50 inline-flex items-center"
               onClick={() => {
-                if (window.confirm(`Excluir a viagem "${trip.name}"? Essa ação não pode ser desfeita.`)) {
+                if (window.confirm(`Excluir a viagem "${trip.name}"? Essa aÃ§Ã£o nÃ£o pode ser desfeita.`)) {
                   onDelete(trip.id);
                 }
               }}
@@ -176,7 +265,7 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
         </div>
       </div>
 
-      {/* Conteúdo em grid */}
+      {/* ConteÃºdo em grid */}
       <div className="p-4 sm:p-6">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Esquerda: imagem + dados principais */}
@@ -212,6 +301,14 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                   </div>
                 </div>
               </div>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  className="px-3 py-1.5 text-sm rounded-md border text-slate-800 border-slate-200 hover:bg-slate-50 inline-flex items-center gap-2"
+                  onClick={() => setIsEditOpen(true)}
+                >
+                  <Pencil className="w-4 h-4" /> Editar
+                </button>
+              </div>
             </div>
           </div>
 
@@ -243,9 +340,31 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
 
         {/* Categorias */}
         <div className="mt-6 rounded-xl border p-4 bg-white">
-          <p className="text-base font-medium mb-3">Categorias de Gastos</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-base font-medium">Categorias de Gastos</p>
+            <button
+              className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600 hover:opacity-90"
+              onClick={() => setIsAddCategoryOpen(true)}
+            >
+              Adicionar categoria
+            </button>
+          </div>
           <div className="space-y-3">
-            {trip.categories.map((category) => {
+            {budget.loading && (
+              <div className="text-sm text-gray-500">Carregando categorias e gastos...</div>
+            )}
+            {!budget.loading && budget.categories.filter(c => c.hasTarget || c.spent > 0).length === 0 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">Nenhuma categoria definida</div>
+                <button
+                  className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600 hover:opacity-90"
+                  onClick={() => setIsAddCategoryOpen(true)}
+                >
+                  Adicionar categoria
+                </button>
+              </div>
+            )}
+            {!budget.loading && budget.categories.filter(c => c.hasTarget || c.spent > 0).map((category) => {
               const categoryProgress =
                 category.planned > 0 ? (category.spent / category.planned) * 100 : 0;
               const isOverBudget = category.spent > category.planned;
@@ -265,14 +384,32 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                     </div>
                     <div className="flex gap-2">
                       <button
-                        className="px-2.5 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 flex items-center"
+                        className="px-2.5 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100"
+                        onClick={() => setExpandedCategoryId((v) => (v === category.id ? null : category.id))}
+                      >
+                        {expandedCategoryId === category.id ? 'Ocultar Gastos' : 'Ver Gastos'}
+                      </button>
+                      <button
+                        className={`px-2.5 py-1.5 text-sm rounded-md border border-gray-300 flex items-center ${category.hasTarget ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
+                        disabled={!category.hasTarget}
                         onClick={() => {
+                          if (!category.hasTarget) return;
                           setEditingCategory(category);
                           setIsAddExpenseOpen(true);
                         }}
                       >
                         <Plus className="w-4 h-4 mr-1" />
                         Adicionar Gasto
+                      </button>
+                      <button
+                        className="px-2.5 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 flex items-center"
+                        onClick={() => {
+                          setEditingTargetId(category.id);
+                          setTargetValue(category.planned ? String(category.planned) : '');
+                        }}
+                      >
+                        <Pencil className="w-4 h-4 mr-1" />
+                        {category.planned > 0 ? 'Editar Meta' : 'Definir Meta'}
                       </button>
                       <button
                         className="px-2.5 py-1.5 text-sm rounded-md hover:bg-red-50 text-red-600 flex items-center"
@@ -292,7 +429,7 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                   />
                   {isOverBudget && (
                     <p className="text-[11px] text-red-600 mt-1">
-                      Acima do orçamento em {formatCurrency(category.spent - category.planned)}
+                      Acima do orÃ§amento em {formatCurrency(category.spent - category.planned)}
                     </p>
                   )}
 
@@ -336,6 +473,127 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                       </div>
                     </div>
                   )}
+
+                  {expandedCategoryId === category.id && (
+                    <div className="mt-3 rounded-md border bg-white">
+                      <div className="p-2 text-xs text-gray-600">Gastos da categoria</div>
+                      <ul className="divide-y">
+                        {budget.raw.items
+                          .filter((it) => it.category_id === category.id)
+                          .map((it) => (
+                            <li key={it.id} className="p-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm truncate">{it.title || 'Gasto'}</div>
+                                  <div className="text-xs text-gray-500">{it.date || '-'}</div>
+                                </div>
+                                <div className="text-sm font-medium">{formatCurrency(it.actual_amount ?? 0)}</div>
+                                <div className="flex items-center gap-2">
+                                  <button className="px-2 py-1 text-xs rounded-md border hover:bg-gray-50" onClick={() => {
+                                    setEditingItemId(it.id);
+                                    setEditItemTitle(it.title || '');
+                                    setEditItemDate(it.date || new Date().toISOString().slice(0,10));
+                                    setEditItemAmount(String(it.actual_amount ?? 0));
+                                  }}>Editar</button>
+                                  <button className="px-2 py-1 text-xs rounded-md text-red-600 hover:bg-red-50" onClick={async () => {
+                                    try {
+                                      await toast.promise(budget.removeExpense(it.id), {
+                                        loading: 'Removendo gasto...',
+                                        success: 'Gasto removido',
+                                        error: (e) => getErrorMessage(e, 'Falha ao remover gasto'),
+                                      })
+                                    } catch {}
+                                  }}>Excluir</button>
+                                </div>
+                              </div>
+
+                              {editingItemId === it.id && (
+                                <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2">
+                                  <input className="rounded-md border px-2 py-1 text-sm md:col-span-2" placeholder="TÃ­tulo" value={editItemTitle} onChange={(e) => setEditItemTitle(e.target.value)} />
+                                  <input type="date" className="rounded-md border px-2 py-1 text-sm" value={editItemDate} onChange={(e) => setEditItemDate(e.target.value)} />
+                                  <input type="number" step="0.01" className="rounded-md border px-2 py-1 text-sm" placeholder="0.00" value={editItemAmount} onChange={(e) => setEditItemAmount(e.target.value)} />
+                                  <div className="md:col-span-4 flex justify-end gap-2">
+                                    <button className="px-3 py-1.5 text-sm rounded-md border" onClick={() => { setEditingItemId(null); }}>Cancelar</button>
+                                    <button className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600" onClick={async () => {
+                                      const amt = parseFloat(editItemAmount)
+                                      if (isNaN(amt) || amt < 0) { toast.error('Digite um valor vÃ¡lido'); return }
+                                      try {
+                                        await toast.promise(budget.updateExpense(it.id, { title: editItemTitle || undefined, actual_amount: amt, date: editItemDate || undefined }), {
+                                          loading: 'Salvando...',
+                                          success: 'Gasto atualizado',
+                                          error: (e) => getErrorMessage(e, 'Falha ao atualizar gasto'),
+                                        })
+                                        setEditingItemId(null)
+                                      } catch {}
+                                    }}>Salvar</button>
+                                  </div>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        {budget.raw.items.filter((it) => it.category_id === category.id).length === 0 && (
+                          <li className="p-3 text-sm text-gray-500">Nenhum gasto ainda</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                  {editingTargetId === category.id && (
+                    <div className="mt-3 p-3 rounded-md border bg-white">
+                      <div className="text-sm font-medium mb-2">
+                        {category.planned > 0 ? 'Editar Meta' : 'Definir Meta'} - {category.name}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label
+                          htmlFor={`target-${category.id}`}
+                          className="text-xs text-gray-600"
+                        >
+                          Valor planejado (R$)
+                        </label>
+                        <input
+                          id={`target-${category.id}`}
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={targetValue}
+                          onChange={(e) => setTargetValue(e.target.value)}
+                          className="w-32 rounded-md border px-2 py-1 text-sm bg-transparent"
+                        />
+                        <button
+                          className="px-3 py-1.5 text-sm rounded-md border"
+                          onClick={() => {
+                            setEditingTargetId(null);
+                            setTargetValue('');
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600"
+                          onClick={async () => {
+                            const value = parseFloat(targetValue)
+                            if (isNaN(value) || value < 0) {
+                              toast.error('Digite um valor vÃ¡lido')
+                              return
+                            }
+                            try {
+                              await toast.promise(
+                                budget.setCategoryTarget(category.id, value),
+                                {
+                                  loading: 'Salvando meta...',
+                                  success: 'Meta salva com sucesso',
+                                  error: (e) => getErrorMessage(e, 'Falha ao salvar meta'),
+                                }
+                              )
+                              setEditingTargetId(null)
+                              setTargetValue('')
+                            } catch { /* handled by toast */ }
+                          }}
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -361,12 +619,141 @@ export default function TripDetails({ trip, onUpdateTrip, onDelete, onClose }: T
                 total_budget: trip.budget,
                 image_url: trip.imageUrl ?? '',
               }}
+              onSubmit={(values) => {
+                const payload = {
+                  name: values.name,
+                  destination: values.destination,
+                  start_date: values.start_date,
+                  end_date: values.end_date,
+                  currency_code: values.currency_code.toUpperCase(),
+                  total_budget: values.total_budget,
+                }
+                return Promise.resolve(
+                  (typeof onUpdateTrip === 'function')
+                    ? onUpdateTrip(String(trip.id), payload)
+                    : undefined
+                )
+              }}
               onUpdated={() => {
                 setIsEditOpen(false)
                 toast.success('Viagem atualizada')
               }}
               onCancel={() => setIsEditOpen(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Modal: adicionar primeira categoria */}
+      {isAddCategoryOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto"
+          onClick={() => setIsAddCategoryOpen(false)}
+        >
+          <div className="my-8 w-full max-w-xl px-4" onClick={(e) => e.stopPropagation()}>
+            <div className="rounded-xl bg-white border border-gray-200 shadow-lg p-4 sm:p-6">
+              <h3 className="text-base font-semibold mb-2">Selecionar Categoria</h3>
+              <p className="text-sm text-gray-600 mb-4">Escolha uma categoria predefinida e defina a meta planejada.</p>
+
+              <div className="mb-2">
+                <input
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Buscar categoria..."
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                />
+              </div>
+              <div className="max-h-64 overflow-auto rounded-md border">
+                {budget.raw.categories
+                  .filter(c => !budget.raw.targets.some(t => t.category_id === c.id))
+                  .filter(c => !categorySearch || (displayCatName(c).toLowerCase().includes(categorySearch.toLowerCase())))
+                  .map(c => (
+                    <label key={c.id} className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="new-category"
+                        checked={!newCategoryIsOther && newCategoryId === c.id}
+                        onChange={() => { setNewCategoryId(c.id); setNewCategoryIsOther(false) }}
+                      />
+                      <span className="text-sm">{displayCatName(c)}</span>
+                    </label>
+                  ))}
+                <label className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="new-category"
+                    checked={newCategoryIsOther}
+                    onChange={() => { setNewCategoryIsOther(true); setNewCategoryId(null) }}
+                  />
+                  <span className="text-sm">Outro</span>
+                </label>
+              </div>
+
+              {newCategoryIsOther && (
+                <div className="mt-3">
+                  <label className="block text-sm text-gray-600 mb-1">Nome da nova categoria</label>
+                  <input
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="Ex: Presentes"
+                    value={newCategoryOtherName}
+                    onChange={(e) => setNewCategoryOtherName(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center gap-2">
+                <label htmlFor="new-cat-planned" className="text-xs text-gray-600">Meta planejada (R$)</label>
+                <input
+                  id="new-cat-planned"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={newCategoryPlanned}
+                  onChange={(e) => setNewCategoryPlanned(e.target.value)}
+                  className="w-40 rounded-md border px-2 py-1 text-sm"
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  className="rounded-md border px-4 py-2 text-sm hover:bg-gray-50"
+                  onClick={() => setIsAddCategoryOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-md bg-blue-600 text-white px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={(!newCategoryIsOther && !newCategoryId) || !newCategoryPlanned || (newCategoryIsOther && !otherSeed)}
+                  onClick={async () => {
+                    const value = parseFloat(newCategoryPlanned)
+                    if (isNaN(value) || value < 0) {
+                      toast.error('Digite um valor vÃ¡lido')
+                      return
+                    }
+                    try {
+                      let categoryId = newCategoryId
+                      if (newCategoryIsOther) categoryId = otherSeed?.id ?? null
+                      if (!categoryId) return
+                      await toast.promise(
+                        budget.setCategoryTarget(categoryId, value),
+                        {
+                          loading: 'Salvando meta...',
+                          success: 'Meta salva',
+                          error: (e) => getErrorMessage(e, 'Falha ao salvar meta'),
+                        }
+                      )
+                      setIsAddCategoryOpen(false)
+                      setNewCategoryId(null)
+                      setNewCategoryPlanned('')
+                      setNewCategoryIsOther(false)
+                      setNewCategoryOtherName('')
+                    } catch {/* handled by toast */}
+                  }}
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -66,6 +66,7 @@ export type ApiTrip = {
   id: number
   user_id: number
   name: string
+  destination?: string | null
   start_date: string // "YYYY-MM-DD"
   end_date: string   // "YYYY-MM-DD"
   currency_code: string
@@ -75,6 +76,7 @@ export type ApiTrip = {
 
 export type TripCreate = {
   name: string
+  destination: string
   start_date: string
   end_date: string
   currency_code: string
@@ -84,6 +86,7 @@ export type TripCreate = {
 /** TripUpdate do seu router aceita parciais (PUT com campos opcionais) */
 export type TripUpdate = Partial<{
   name: string
+  destination: string
   start_date: string
   end_date: string
   currency_code: string
