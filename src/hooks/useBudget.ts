@@ -91,7 +91,6 @@ export function useBudget(tripId: number | string) {
 
   // Ações
   async function addExpense(categoryId: number, value: number, opts?: { title?: string; date?: string }) {
-    const today = new Date().toISOString().slice(0, 10)
     const payload = {
       category_id: categoryId,
       title: opts?.title ?? 'Gasto',
