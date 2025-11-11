@@ -1,5 +1,5 @@
 // src/components/TripCard.tsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useBudget } from '@/hooks/useBudget';
 
 // Tipos locais (compatíveis com o que Home.tsx envia)
@@ -76,6 +76,21 @@ export function TripCard({ trip,onDelete, onOpenDetails }: TripCardProps) {
   const tripIdNum = useMemo(() => Number(trip.id), [trip.id])
   const budget = useBudget(tripIdNum)
 
+  // Atualiza o resumo deste card quando houver mudanças vindas do overlay
+  useEffect(() => {
+    const handler = () => {
+      try { budget.refetch?.() } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('dashboard:refresh', handler)
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('dashboard:refresh', handler)
+      }
+    }
+  }, [budget])
+
   const categoriesFromBudget = useMemo(() => (
     budget.categories.map((c) => ({
       id: String(c.id),
@@ -86,9 +101,11 @@ export function TripCard({ trip,onDelete, onOpenDetails }: TripCardProps) {
     }))
   ), [budget.categories])
 
-  const categories = (trip.categories && trip.categories.length > 0)
-    ? trip.categories
-    : categoriesFromBudget
+  // Prefere os dados atualizados do hook local (sempre refetch por trip)
+  // Se ainda não carregou nada, usa as categorias vindas do pai
+  const categories = (categoriesFromBudget && categoriesFromBudget.length > 0)
+    ? categoriesFromBudget
+    : (trip.categories || [])
 
   const totalPlanned = categories.reduce((sum, cat) => sum + cat.planned, 0);
   const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);

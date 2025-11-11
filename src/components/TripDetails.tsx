@@ -153,15 +153,8 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
   const totalSpent = budget.categories.reduce((sum, cat) => sum + cat.spent, 0);
   const progress = totalPlanned > 0 ? (totalSpent / totalPlanned) * 100 : 0;
   const remaining = totalPlanned - totalSpent;
+  const visibleCategories = budget.categories.filter(c => c.hasTarget || c.spent > 0);
 
-  // From:
-  // "PerÃ­odo" -> "Período"
-  // "OrÃ§amento" -> "Orçamento"
-  // "TÃ­tulo" -> "Título"
-  // "aÃ§Ã£o" -> "ação"
-  // "ConteÃºdo" -> "Conteúdo"
-
-  // These issues seem to be encoding-related (UTF-8 encoding). You should ensure your editor is configured to use UTF-8 encoding to properly handle accented characters.
 
   // The original placeholder code was correct and doesn't need changes:
   const formatCurrency = (value: number) =>
@@ -230,7 +223,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
 
   return (
     <div className="rounded-xl bg-white shadow-lg">
-      {/* Header sticky com tÃ­tulo e aÃ§Ãµes */}
+      {/* Header sticky com título e ações */}
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b rounded-t-xl">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-start gap-3">
@@ -254,7 +247,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
             <button
               className="px-3 py-1.5 text-sm rounded-md border text-red-600 border-red-200 hover:bg-red-50 inline-flex items-center"
               onClick={() => {
-                if (window.confirm(`Excluir a viagem "${trip.name}"? Essa aÃ§Ã£o nÃ£o pode ser desfeita.`)) {
+                if (window.confirm(`Excluir a viagem "${trip.name}"? Essa ação não pode ser desfeita.`)) {
                   onDelete(trip.id);
                 }
               }}
@@ -342,18 +335,20 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
         <div className="mt-6 rounded-xl border p-4 bg-white">
           <div className="flex items-center justify-between mb-3">
             <p className="text-base font-medium">Categorias de Gastos</p>
-            <button
-              className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600 hover:opacity-90"
-              onClick={() => setIsAddCategoryOpen(true)}
-            >
-              Adicionar categoria
-            </button>
+            {visibleCategories.length > 0 && (
+              <button
+                className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600 hover:opacity-90"
+                onClick={() => setIsAddCategoryOpen(true)}
+              >
+                Adicionar categoria
+              </button>
+            )}
           </div>
           <div className="space-y-3">
             {budget.loading && (
               <div className="text-sm text-gray-500">Carregando categorias e gastos...</div>
             )}
-            {!budget.loading && budget.categories.filter(c => c.hasTarget || c.spent > 0).length === 0 && (
+            {!budget.loading && visibleCategories.length === 0 && (
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-600">Nenhuma categoria definida</div>
                 <button
@@ -364,7 +359,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
                 </button>
               </div>
             )}
-            {!budget.loading && budget.categories.filter(c => c.hasTarget || c.spent > 0).map((category) => {
+            {!budget.loading && visibleCategories.map((category) => {
               const categoryProgress =
                 category.planned > 0 ? (category.spent / category.planned) * 100 : 0;
               const isOverBudget = category.spent > category.planned;
@@ -429,7 +424,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
                   />
                   {isOverBudget && (
                     <p className="text-[11px] text-red-600 mt-1">
-                      Acima do orÃ§amento em {formatCurrency(category.spent - category.planned)}
+                      Acima do orçamento em {formatCurrency(category.spent - category.planned)}
                     </p>
                   )}
 

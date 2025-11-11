@@ -58,6 +58,12 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel, onS
   const startDate = form.watch('start_date')
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const id = toId(tripId)
+    if (!Number.isFinite(id)) {
+      toast.error('ID da viagem inválido.')
+      return
+    }
+
     const payload = {
       name: values.name,
       destination: values.destination,
@@ -68,14 +74,14 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel, onS
       image_url: values.image_url,
     }
 
-    const id = toId(tripId)
-    if (!Number.isFinite(id)) {
-      toast.error('ID da viagem inválido.')
-      return
-    }
+    // Se o pai forneceu um onSubmit, use-o (permite atualizar estado externo)
+    // Caso contrário, faz o update direto via serviço
+    const action = _onSubmitProp
+      ? () => Promise.resolve(_onSubmitProp(values))
+      : () => updateTrip(id as number, payload as any)
 
     await toast.promise(
-      updateTrip(id as number, payload as any),
+      action(),
       {
         loading: 'Atualizando...',
         success: 'Viagem atualizada!',

@@ -81,7 +81,7 @@ export type TripItemCreate = Partial<{
   title: string
   planned_amount: number
   actual_amount: number
-  date: string // YYYY-MM-DD
+  date: string | null // YYYY-MM-DD | null
 }>
 
 export type TripItemUpdate = Partial<{
@@ -89,7 +89,7 @@ export type TripItemUpdate = Partial<{
   title: string
   planned_amount: number
   actual_amount: number
-  date: string
+  date: string | null
 }>
 
 export type ListItemsParams = {
@@ -122,8 +122,12 @@ export async function createBudgetCategory(payload: { name: string; icon?: strin
 }
 
 /* -------- Itens (por viagem) -------- */
-export async function listTripItems(tripId: number, params?: ListItemsParams, signal?: AbortSignal): Promise<TripItem[]> {
-  const res = await authFetch(`/trips/${tripId}/items${toQuery(params)}`, { signal })
+export async function listTripItems(
+  tripId: number,
+  params?: ListItemsParams,
+  signal?: AbortSignal
+): Promise<TripItem[]> {
+  const res = await authFetch(`/trips/${tripId}/items${toQuery(params)}` as string, { signal })
   return res.json()
 }
 
@@ -132,10 +136,21 @@ export async function getTripItem(tripId: number, itemId: number): Promise<TripI
   return res.json()
 }
 
+function serializeTripItemPayload<T extends TripItemCreate | TripItemUpdate>(payload: T): any {
+  const out: Record<string, any> = { ...payload }
+  if (typeof out.planned_amount === 'number' && Number.isFinite(out.planned_amount)) {
+    out.planned_amount = out.planned_amount.toFixed(2)
+  }
+  if (typeof out.actual_amount === 'number' && Number.isFinite(out.actual_amount)) {
+    out.actual_amount = out.actual_amount.toFixed(2)
+  }
+  return out
+}
+
 export async function createTripItem(tripId: number, payload: TripItemCreate): Promise<TripItem> {
   const res = await authFetch(`/trips/${tripId}/items`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(serializeTripItemPayload(payload)),
   })
   return res.json()
 }
@@ -143,7 +158,7 @@ export async function createTripItem(tripId: number, payload: TripItemCreate): P
 export async function updateTripItem(tripId: number, itemId: number, payload: TripItemUpdate): Promise<TripItem> {
   const res = await authFetch(`/trips/${tripId}/items/${itemId}`, {
     method: 'PUT',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(serializeTripItemPayload(payload)),
   })
   return res.json()
 }

@@ -96,7 +96,9 @@ export function useBudget(tripId: number | string) {
       category_id: categoryId,
       title: opts?.title ?? 'Gasto',
       actual_amount: value,
-      date: opts?.date ?? today,
+      // Backend exige None (null) para "date" no create (422 none_required)
+      // Envie null aqui; se for necessário editar a data, use update.
+      date: null as any,
     }
     const created = await createTripItem(id as number, payload)
     setItems((prev) => [created, ...prev])
@@ -138,12 +140,14 @@ export function useBudget(tripId: number | string) {
       const has = prev.some((t) => t.category_id === categoryId)
       return has ? prev.map((t) => (t.category_id === categoryId ? res : t)) : [res, ...prev]
     })
+    try { window.dispatchEvent(new CustomEvent('dashboard:refresh')) } catch {}
     return res
   }
 
   async function removeCategoryTarget(categoryId: number) {
     await deleteTarget(id as number, categoryId)
     setTargets((prev) => prev.filter((t) => t.category_id !== categoryId))
+    try { window.dispatchEvent(new CustomEvent('dashboard:refresh')) } catch {}
   }
 
   async function createCategory(name: string, icon?: string | null) {
