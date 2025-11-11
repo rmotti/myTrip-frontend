@@ -97,6 +97,7 @@ export function useBudget(tripId: number | string) {
 
   // Ações
   async function addExpense(categoryId: number, value: number, opts?: { title?: string; date?: string }) {
+    void opts
     // Regra: gasto deve "conversar" com a meta (mesmo registro).
     // Procuramos o item de target (título especial) e somamos no actual_amount.
     const TARGET_TITLE = '__target__'
