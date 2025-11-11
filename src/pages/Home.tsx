@@ -110,7 +110,8 @@ export default function Home() {
     const auth = getAuth();
     try {
       await signOut(auth);
-      navigate("/login");
+      // Redirect to external landing page after logout
+      window.location.replace("https://mytrip-landing-page.vercel.app/");
     } catch (error) {
       console.error("Erro ao sair:", error);
     }

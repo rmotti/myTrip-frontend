@@ -1,16 +1,15 @@
 // src/components/NewTripForm.tsx
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Plane, Hotel, Utensils, Camera, Car, ShoppingBag, Plus } from 'lucide-react'
-import type { JSX } from 'react'
 import { createTrip } from '../services/trips'
+// categorias foram removidas do formulário de criação
 import { getErrorMessage } from '../utils/getErrorMessage'
 
 
-export type CategoryDraft = { id: string; name: string; icon: string; planned: number };
+// Removido: definição de categoria para o formulário de criação
 
 export const tripSchema = z
   .object({
@@ -52,26 +51,7 @@ type NewTripFormProps = {
   onSubmit?: (values: FormValues) => Promise<unknown> | unknown
 }
 
-const PRESET_CATEGORIES: Array<{ key: string; label: string; icon: string }> = [
-  { key: 'plane', label: 'Passagens', icon: 'plane' },
-  { key: 'hotel', label: 'Hospedagem', icon: 'hotel' },
-  { key: 'utensils', label: 'Alimentação', icon: 'utensils' },
-  { key: 'camera', label: 'Passeios', icon: 'camera' },
-  { key: 'car', label: 'Transporte', icon: 'car' },
-  { key: 'shopping-bag', label: 'Compras', icon: 'shopping-bag' },
-];
-
-function PresetIcon({ name }: { name: string }) {
-  const map: Record<string, JSX.Element> = {
-    plane: <Plane className="w-4 h-4" />,
-    hotel: <Hotel className="w-4 h-4" />,
-    utensils: <Utensils className="w-4 h-4" />,
-    camera: <Camera className="w-4 h-4" />,
-    car: <Car className="w-4 h-4" />,
-    'shopping-bag': <ShoppingBag className="w-4 h-4" />,
-  };
-  return map[name] ?? <ShoppingBag className="w-4 h-4" />;
-}
+// Removidos presets de categorias na criação
 
 export default function NewTripForm({ onCreated, onCancel, title, submitLabel, initial, onSubmit: onSubmitProp }: NewTripFormProps) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
@@ -89,13 +69,29 @@ export default function NewTripForm({ onCreated, onCancel, title, submitLabel, i
       ...(initial || {}),
     },
   })
+  // Currency select helper
+  const initialCurrency = (initial?.currency_code || 'BRL').toUpperCase()
+  const known = new Set(['BRL', 'USD', 'EUR'])
+  const [currencySelect, setCurrencySelect] = useState<'BRL' | 'USD' | 'EUR' | 'OTHER'>(
+    known.has(initialCurrency) ? (initialCurrency as 'BRL' | 'USD' | 'EUR') : 'BRL'
+  )
+  useEffect(() => {
+    if (currencySelect !== 'OTHER') {
+      form.setValue('currency_code', currencySelect, { shouldValidate: true })
+    }
+  }, [currencySelect])
   const startDate = form.watch('start_date')
+  // Sincroniza automaticamente a data de término quando a de início mudar
+  useEffect(() => {
+    if (!startDate) return
+    const end = form.getValues('end_date')
+    if (!end || end < startDate) {
+      form.setValue('end_date', startDate, { shouldValidate: true, shouldDirty: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate])
 
-  // categorias opcionais (UI semelhante, mas fora da validação principal)
-  const categories: CategoryDraft[] = []
-  const addPreset = (_c: { key: string; label: string; icon: string }) => {}
-  const addCategory = () => {}
-  const removeCategory = (_id: string) => {}
+  // categorias removidas do formulário de criação
 
   const onSubmit = form.handleSubmit(async (values) => {
     const payload = {
@@ -205,68 +201,34 @@ export default function NewTripForm({ onCreated, onCancel, title, submitLabel, i
       </div>
 
       <div>
-        <label className="block text-sm text-gray-600 mb-1">Moeda (3 letras)</label>
-        <input
-          className="w-full rounded-md border px-3 py-2 uppercase"
-          maxLength={3}
-          {...form.register('currency_code')}
-        />
+        <label className="block text-sm text-gray-600 mb-1">Moeda</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <select
+            className="w-full rounded-md border px-3 py-2"
+            value={currencySelect}
+            onChange={(e) => setCurrencySelect(e.target.value as any)}
+          >
+            <option value="BRL">Real (BRL)</option>
+            <option value="USD">Dólar (USD)</option>
+            <option value="EUR">Euro (EUR)</option>
+            <option value="OTHER">Outro</option>
+          </select>
+          {currencySelect === 'OTHER' && (
+            <input
+              className="w-full rounded-md border px-3 py-2 uppercase"
+              placeholder="Código (ex: GBP)"
+              maxLength={3}
+              {...form.register('currency_code')}
+            />
+          )}
+        </div>
         {form.formState.errors.currency_code && (
           <p className="text-sm text-red-500">{form.formState.errors.currency_code.message}</p>
         )}
       </div>
     </div>
 
-    <div className="mt-6 rounded-xl border p-4">
-      <h3 className="text-base font-medium mb-3">Categorias de Gastos</h3>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {PRESET_CATEGORIES.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => addPreset(c)}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm hover:bg-gray-50"
-          >
-            <PresetIcon name={c.icon} /> {c.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          className="flex-1 rounded-md border px-3 py-2"
-          placeholder="Nome da categoria"
-          disabled
-        />
-        <input
-          className="w-40 rounded-md border px-3 py-2"
-          placeholder="Valor planejado"
-          type="number"
-          step="0.01"
-          disabled
-        />
-        <button
-          onClick={addCategory}
-          className="inline-flex items-center justify-center rounded-lg bg-slate-900 text-white px-3 py-2 hover:bg-slate-800"
-          title="Adicionar categoria"
-          >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-
-      {categories.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {categories.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded-lg bg-gray-50 border px-3 py-2">
-              <div className="text-sm text-gray-800">{c.name}</div>
-              <div className="text-sm text-gray-600">
-                {c.planned.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </div>
-              <button className="text-red-600 hover:underline text-sm" onClick={() => removeCategory(c.id)}>remover</button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    {/* Campo de categorias removido do formulário de criação */}
 
     <div className="mt-6 flex justify-end gap-3">
       <button

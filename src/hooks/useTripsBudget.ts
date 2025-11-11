@@ -63,7 +63,13 @@ function buildSummary(cats: BudgetCategory[], targets: CategoryTarget[], items: 
   const plannedBy = new Map<number, number>()
   for (const t of targets) plannedBy.set(t.category_id, t.planned_amount)
   const spentBy = new Map<number, number>()
-  for (const it of items) spentBy.set(it.category_id, (spentBy.get(it.category_id) ?? 0) + (it.actual_amount ?? 0))
+  // Consolidar preferencialmente pelos itens '__target__'
+  const hasTargetItem = new Set<number>()
+  for (const it of items) if (it.title === '__target__') hasTargetItem.add(it.category_id)
+  for (const it of items) {
+    if (hasTargetItem.size > 0 && hasTargetItem.has(it.category_id) && it.title !== '__target__') continue
+    spentBy.set(it.category_id, (spentBy.get(it.category_id) ?? 0) + (it.actual_amount ?? 0))
+  }
 
   const nameOf = (c: any): string => {
     const n = c?.name ?? c?.title ?? c?.label ?? c?.display_name ?? c?.slug ?? c?.code

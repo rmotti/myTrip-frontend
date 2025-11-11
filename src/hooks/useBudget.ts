@@ -70,7 +70,13 @@ export function useBudget(tripId: number | string) {
       return n ? String(n) : `Categoria ${c?.id ?? ''}`
     }
     const spentByCat = new Map<number, number>()
+    // Preferimos consolidar pelo item de target ('__target__') para evitar duplicidade
+    const hasTargetItem = new Set<number>()
     for (const it of items) {
+      if (it.title === '__target__') hasTargetItem.add(it.category_id)
+    }
+    for (const it of items) {
+      if (hasTargetItem.size > 0 && hasTargetItem.has(it.category_id) && it.title !== '__target__') continue
       spentByCat.set(it.category_id, (spentByCat.get(it.category_id) ?? 0) + (it.actual_amount ?? 0))
     }
 
@@ -91,12 +97,35 @@ export function useBudget(tripId: number | string) {
 
   // Ações
   async function addExpense(categoryId: number, value: number, opts?: { title?: string; date?: string }) {
+    // Regra: gasto deve "conversar" com a meta (mesmo registro).
+    // Procuramos o item de target (título especial) e somamos no actual_amount.
+    const TARGET_TITLE = '__target__'
+    const existing = items.find((i) => i.category_id === categoryId && (i.title === TARGET_TITLE))
+
+    if (existing) {
+      const prevAmount = Number(existing.actual_amount ?? 0)
+      const nextAmount = prevAmount + value
+
+      // Otimismo de UI
+      const snapshot = items
+      setItems((p) => p.map((it) => (it.id === existing.id ? { ...it, actual_amount: nextAmount } as TripItem : it)))
+      try {
+        const updated = await updateTripItem(id as number, existing.id, { actual_amount: nextAmount })
+        setItems((p) => p.map((it) => (it.id === existing.id ? updated : it)))
+        return updated
+      } catch (e) {
+        // Reverte em caso de falha
+        setItems(snapshot)
+        throw e
+      }
+    }
+
+    // Se não houver target ainda, criamos um item target com planned 0 e actual = value
     const payload = {
       category_id: categoryId,
-      title: opts?.title ?? 'Gasto',
+      title: TARGET_TITLE,
+      planned_amount: 0,
       actual_amount: value,
-      // Backend exige None (null) para "date" no create (422 none_required)
-      // Envie null aqui; se for necessário editar a data, use update.
       date: null as any,
     }
     const created = await createTripItem(id as number, payload)
@@ -139,13 +168,43 @@ export function useBudget(tripId: number | string) {
       const has = prev.some((t) => t.category_id === categoryId)
       return has ? prev.map((t) => (t.category_id === categoryId ? res : t)) : [res, ...prev]
     })
+    // Também garantimos a presença de um item "__target__" correspondente
+    try {
+      const TARGET_TITLE = '__target__'
+      const hasItem = items.some((i) => i.category_id === categoryId && i.title === TARGET_TITLE)
+      if (!hasItem) {
+        const created = await createTripItem(id as number, {
+          category_id: categoryId,
+          title: TARGET_TITLE,
+          planned_amount,
+          actual_amount: 0,
+          date: null as any,
+        })
+        setItems((prev) => [created, ...prev])
+      } else {
+        // Mantém o planned_amount sincronizado no item existente
+        const existing = items.find((i) => i.category_id === categoryId && i.title === TARGET_TITLE)!
+        const updated = await updateTripItem(id as number, existing.id, { planned_amount })
+        setItems((p) => p.map((it) => (it.id === existing.id ? updated : it)))
+      }
+    } catch {/* se falhar, o /targets já cobre o valor planejado para os resumos */}
     try { window.dispatchEvent(new CustomEvent('dashboard:refresh')) } catch {}
     return res
   }
 
   async function removeCategoryTarget(categoryId: number) {
+    // Apaga a meta no backend
     await deleteTarget(id as number, categoryId)
     setTargets((prev) => prev.filter((t) => t.category_id !== categoryId))
+
+    // Apaga também quaisquer itens da categoria (incluindo o '__target__') no backend
+    const toDelete = items.filter((i) => i.category_id === categoryId)
+    for (const it of toDelete) {
+      try { await deleteTripItem(id as number, it.id) } catch { /* ignore por robustez */ }
+    }
+    // Atualiza estado local
+    setItems((prev) => prev.filter((i) => i.category_id !== categoryId))
+
     try { window.dispatchEvent(new CustomEvent('dashboard:refresh')) } catch {}
   }
 

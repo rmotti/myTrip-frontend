@@ -1,5 +1,5 @@
 // src/components/EditTripForm.tsx
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -56,6 +56,17 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel, onS
     defaultValues: initial,
   })
   const startDate = form.watch('start_date')
+  // Currency select helper
+  const initialCurrency = (initial.currency_code || 'BRL').toUpperCase()
+  const known = new Set(['BRL', 'USD', 'EUR'])
+  const [currencySelect, setCurrencySelect] = useState<'BRL' | 'USD' | 'EUR' | 'OTHER'>(
+    known.has(initialCurrency) ? (initialCurrency as 'BRL' | 'USD' | 'EUR') : 'OTHER'
+  )
+  useEffect(() => {
+    if (currencySelect !== 'OTHER') {
+      form.setValue('currency_code', currencySelect, { shouldValidate: true })
+    }
+  }, [currencySelect])
 
   const onSubmit = form.handleSubmit(async (values) => {
     const id = toId(tripId)
@@ -131,8 +142,27 @@ export default function EditTripForm({ tripId, initial, onUpdated, onCancel, onS
           {form.formState.errors.total_budget && (<p className="text-sm text-red-500">{form.formState.errors.total_budget.message}</p>)}
         </div>
         <div>
-          <label className="block text-sm text-gray-600 mb-1">Moeda (3 letras)</label>
-          <input className="w-full rounded-md border px-3 py-2 uppercase" maxLength={3} {...form.register('currency_code')} />
+          <label className="block text-sm text-gray-600 mb-1">Moeda</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <select
+              className="w-full rounded-md border px-3 py-2"
+              value={currencySelect}
+              onChange={(e) => setCurrencySelect(e.target.value as any)}
+            >
+              <option value="BRL">Real (BRL)</option>
+              <option value="USD">Dólar (USD)</option>
+              <option value="EUR">Euro (EUR)</option>
+              <option value="OTHER">Outro</option>
+            </select>
+            {currencySelect === 'OTHER' && (
+              <input
+                className="w-full rounded-md border px-3 py-2 uppercase"
+                placeholder="Código (ex: GBP)"
+                maxLength={3}
+                {...form.register('currency_code')}
+              />
+            )}
+          </div>
           {form.formState.errors.currency_code && (<p className="text-sm text-red-500">{form.formState.errors.currency_code.message}</p>)}
         </div>
 
