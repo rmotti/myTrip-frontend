@@ -120,6 +120,7 @@ type TripDetailsProps = {
 export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: TripDetailsProps) {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [spentValue, setSpentValue] = useState('');
+  const [spentTitle, setSpentTitle] = useState('');
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTargetId, setEditingTargetId] = useState<number | null>(null);
@@ -133,7 +134,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
   const [newCategoryOtherName, setNewCategoryOtherName] = useState('');
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editItemTitle, setEditItemTitle] = useState('');
-  const [editItemDate, setEditItemDate] = useState('');
+  const [, setEditItemDate] = useState('');
   const [editItemAmount, setEditItemAmount] = useState('');
 
   const tripIdNum = useMemo(() => Number(trip.id), [trip.id])
@@ -173,17 +174,8 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
       return;
     }
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      const start = trip.startDate
-      const end = trip.endDate
-      const clamp = (d: string) => {
-        if (start && d < start) return start
-        if (end && d > end) return end
-        return d
-      }
-      const dateToUse = clamp(today)
       await toast.promise(
-        budget.addExpense(editingCategory.id, value, { title: `Gasto - ${editingCategory.name}`, date: dateToUse }),
+        budget.addExpense(editingCategory.id, value, { title: (spentTitle || editingCategory.name) }),
         {
           loading: 'Adicionando gasto...',
           success: 'Gasto adicionado com sucesso',
@@ -191,6 +183,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
         }
       )
       setSpentValue('');
+      setSpentTitle('');
       setEditingCategory(null);
       setIsAddExpenseOpen(false);
     } catch {/* handled by toast */}
@@ -433,7 +426,16 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
                       <div className="text-sm font-medium mb-2">
                         Adicionar Gasto - {category.name}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="text-xs text-gray-600" htmlFor={`title-${category.id}`}>Título</label>
+                        <input
+                          id={`title-${category.id}`}
+                          type="text"
+                          placeholder={category.name}
+                          value={spentTitle}
+                          onChange={(e) => setSpentTitle(e.target.value)}
+                          className="flex-1 min-w-[180px] rounded-md border px-2 py-1 text-sm bg-transparent"
+                        />
                         <label
                           htmlFor={`spent-${category.id}`}
                           className="text-xs text-gray-600"
@@ -455,6 +457,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
                             setIsAddExpenseOpen(false);
                             setEditingCategory(null);
                             setSpentValue('');
+                            setSpentTitle('');
                           }}
                         >
                           Cancelar
@@ -474,7 +477,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
                       <div className="p-2 text-xs text-gray-600">Gastos da categoria</div>
                       <ul className="divide-y">
                         {budget.raw.items
-                          .filter((it) => it.category_id === category.id)
+                          .filter((it) => it.category_id === category.id && it.title !== '__target__')
                           .map((it) => (
                             <li key={it.id} className="p-3">
                               <div className="flex items-center justify-between gap-3">
@@ -503,17 +506,16 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
                               </div>
 
                               {editingItemId === it.id && (
-                                <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2">
-                                  <input className="rounded-md border px-2 py-1 text-sm md:col-span-2" placeholder="TÃ­tulo" value={editItemTitle} onChange={(e) => setEditItemTitle(e.target.value)} />
-                                  <input type="date" className="rounded-md border px-2 py-1 text-sm" value={editItemDate} onChange={(e) => setEditItemDate(e.target.value)} />
+                                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                                  <input className="rounded-md border px-2 py-1 text-sm md:col-span-2" placeholder="Título" value={editItemTitle} onChange={(e) => setEditItemTitle(e.target.value)} />
                                   <input type="number" step="0.01" className="rounded-md border px-2 py-1 text-sm" placeholder="0.00" value={editItemAmount} onChange={(e) => setEditItemAmount(e.target.value)} />
-                                  <div className="md:col-span-4 flex justify-end gap-2">
+                                  <div className="md:col-span-3 flex justify-end gap-2">
                                     <button className="px-3 py-1.5 text-sm rounded-md border" onClick={() => { setEditingItemId(null); }}>Cancelar</button>
                                     <button className="px-3 py-1.5 text-sm rounded-md text-white bg-gradient-to-r from-blue-600 to-teal-600" onClick={async () => {
                                       const amt = parseFloat(editItemAmount)
                                       if (isNaN(amt) || amt < 0) { toast.error('Digite um valor vÃ¡lido'); return }
                                       try {
-                                        await toast.promise(budget.updateExpense(it.id, { title: editItemTitle || undefined, actual_amount: amt, date: editItemDate || undefined }), {
+                                        await toast.promise(budget.updateExpense(it.id, { title: editItemTitle || undefined, actual_amount: amt }), {
                                           loading: 'Salvando...',
                                           success: 'Gasto atualizado',
                                           error: (e) => getErrorMessage(e, 'Falha ao atualizar gasto'),
@@ -526,7 +528,7 @@ export default function TripDetails({ trip, onDelete, onClose , onUpdateTrip }: 
                               )}
                             </li>
                           ))}
-                        {budget.raw.items.filter((it) => it.category_id === category.id).length === 0 && (
+                        {budget.raw.items.filter((it) => it.category_id === category.id && it.title !== '__target__').length === 0 && (
                           <li className="p-3 text-sm text-gray-500">Nenhum gasto ainda</li>
                         )}
                       </ul>

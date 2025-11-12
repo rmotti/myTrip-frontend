@@ -69,7 +69,7 @@ function mapToTripCard(t: ApiTrip): TripCardType {
 }
 
 export default function Home() {
-  const { trips, loading, updateTrip, deleteTrip, refetch } = useTrips();
+  const { trips, loading, createTrip, updateTrip, deleteTrip } = useTrips();
   const navigate = useNavigate();
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -94,17 +94,7 @@ export default function Home() {
     })
   }
 
-  // Ouve eventos de refresh de trips (ediÃ§Ã£o/criaÃ§Ã£o)
-  if (typeof window !== 'undefined' && !(window as any).__tripsRefreshListener) {
-    (window as any).__tripsRefreshListener = true
-    window.addEventListener('trips:refresh', async () => {
-      try {
-        await (refetch?.() ?? Promise.resolve())
-      } catch {
-        /* ignore */
-      }
-    })
-  }
+  // Listener de trips:refresh removido; criação/edição atualiza via hook
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -268,7 +258,21 @@ export default function Home() {
           onClick={() => setIsCreateOpen(false)}
         >
           <div className="my-8 w-full max-w-4xl px-4" onClick={(e) => e.stopPropagation()}>
-            <NewTripForm onCancel={() => setIsCreateOpen(false)} onCreated={() => setIsCreateOpen(false)} />
+            <NewTripForm
+              onCancel={() => setIsCreateOpen(false)}
+              onCreated={() => setIsCreateOpen(false)}
+              onSubmit={async (values) => {
+                // Cria via hook para atualizar estado local imediatamente
+                await createTrip({
+                  name: values.name,
+                  destination: values.destination,
+                  start_date: values.start_date,
+                  end_date: values.end_date,
+                  currency_code: values.currency_code.toUpperCase(),
+                  total_budget: values.total_budget,
+                } as any)
+              }}
+            />
           </div>
         </div>
       )}

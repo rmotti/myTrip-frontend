@@ -70,13 +70,8 @@ export function useBudget(tripId: number | string) {
       return n ? String(n) : `Categoria ${c?.id ?? ''}`
     }
     const spentByCat = new Map<number, number>()
-    // Preferimos consolidar pelo item de target ('__target__') para evitar duplicidade
-    const hasTargetItem = new Set<number>()
     for (const it of items) {
-      if (it.title === '__target__') hasTargetItem.add(it.category_id)
-    }
-    for (const it of items) {
-      if (hasTargetItem.size > 0 && hasTargetItem.has(it.category_id) && it.title !== '__target__') continue
+      if (it.title === '__target__') continue
       spentByCat.set(it.category_id, (spentByCat.get(it.category_id) ?? 0) + (it.actual_amount ?? 0))
     }
 
@@ -97,39 +92,14 @@ export function useBudget(tripId: number | string) {
 
   // Ações
   async function addExpense(categoryId: number, value: number, opts?: { title?: string; date?: string }) {
-    void opts
-    // Regra: gasto deve "conversar" com a meta (mesmo registro).
-    // Procuramos o item de target (título especial) e somamos no actual_amount.
-    const TARGET_TITLE = '__target__'
-    const existing = items.find((i) => i.category_id === categoryId && (i.title === TARGET_TITLE))
-
-    if (existing) {
-      const prevAmount = Number(existing.actual_amount ?? 0)
-      const nextAmount = prevAmount + value
-
-      // Otimismo de UI
-      const snapshot = items
-      setItems((p) => p.map((it) => (it.id === existing.id ? { ...it, actual_amount: nextAmount } as TripItem : it)))
-      try {
-        const updated = await updateTripItem(id as number, existing.id, { actual_amount: nextAmount })
-        setItems((p) => p.map((it) => (it.id === existing.id ? updated : it)))
-        return updated
-      } catch (e) {
-        // Reverte em caso de falha
-        setItems(snapshot)
-        throw e
-      }
-    }
-
-    // Se não houver target ainda, criamos um item target com planned 0 e actual = value
-    const payload = {
+    // Backend exige date = None no create e também no update; portanto ignoramos data.
+    const createPayload = {
       category_id: categoryId,
-      title: TARGET_TITLE,
-      planned_amount: 0,
+      title: opts?.title ?? 'Gasto',
       actual_amount: value,
       date: null as any,
     }
-    const created = await createTripItem(id as number, payload)
+    const created = await createTripItem(id as number, createPayload)
     setItems((prev) => [created, ...prev])
     return created
   }
@@ -143,11 +113,13 @@ export function useBudget(tripId: number | string) {
     const prev = items
     const idx = prev.findIndex((i) => i.id === itemId)
     if (idx >= 0) {
-      const optimistic = { ...prev[idx], ...payload }
+      const { date: _ignoredDate, ...rest } = payload as any
+      const optimistic = { ...prev[idx], ...rest }
       setItems((p) => p.map((it) => (it.id === itemId ? (optimistic as TripItem) : it)))
     }
     try {
-      const updated = await updateTripItem(id as number, itemId, payload)
+      const { date: _ignoredDate2, ...rest } = payload as any
+      const updated = await updateTripItem(id as number, itemId, rest)
       setItems((p) => p.map((it) => (it.id === itemId ? updated : it)))
       return updated
     } catch (e) {
@@ -169,26 +141,7 @@ export function useBudget(tripId: number | string) {
       const has = prev.some((t) => t.category_id === categoryId)
       return has ? prev.map((t) => (t.category_id === categoryId ? res : t)) : [res, ...prev]
     })
-    // Também garantimos a presença de um item "__target__" correspondente
-    try {
-      const TARGET_TITLE = '__target__'
-      const hasItem = items.some((i) => i.category_id === categoryId && i.title === TARGET_TITLE)
-      if (!hasItem) {
-        const created = await createTripItem(id as number, {
-          category_id: categoryId,
-          title: TARGET_TITLE,
-          planned_amount,
-          actual_amount: 0,
-          date: null as any,
-        })
-        setItems((prev) => [created, ...prev])
-      } else {
-        // Mantém o planned_amount sincronizado no item existente
-        const existing = items.find((i) => i.category_id === categoryId && i.title === TARGET_TITLE)!
-        const updated = await updateTripItem(id as number, existing.id, { planned_amount })
-        setItems((p) => p.map((it) => (it.id === existing.id ? updated : it)))
-      }
-    } catch {/* se falhar, o /targets já cobre o valor planejado para os resumos */}
+    // Não cria/sincroniza item especial; somente a meta
     try { window.dispatchEvent(new CustomEvent('dashboard:refresh')) } catch {}
     return res
   }

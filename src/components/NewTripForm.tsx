@@ -1,15 +1,14 @@
 // src/components/NewTripForm.tsx
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createTrip } from '../services/trips'
-// categorias foram removidas do formulário de criação
 import { getErrorMessage } from '../utils/getErrorMessage'
 
 
-// Removido: definição de categoria para o formulário de criação
+
 
 export const tripSchema = z
   .object({
@@ -51,7 +50,6 @@ type NewTripFormProps = {
   onSubmit?: (values: FormValues) => Promise<unknown> | unknown
 }
 
-// Removidos presets de categorias na criação
 
 export default function NewTripForm({ onCreated, onCancel, title, submitLabel, initial, onSubmit: onSubmitProp }: NewTripFormProps) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
@@ -69,18 +67,8 @@ export default function NewTripForm({ onCreated, onCancel, title, submitLabel, i
       ...(initial || {}),
     },
   })
-  // Currency select helper
-  const initialCurrency = (initial?.currency_code || 'BRL').toUpperCase()
-  const known = new Set(['BRL', 'USD', 'EUR'])
-  const [currencySelect, setCurrencySelect] = useState<'BRL' | 'USD' | 'EUR' | 'OTHER'>(
-    known.has(initialCurrency) ? (initialCurrency as 'BRL' | 'USD' | 'EUR') : 'BRL'
-  )
-  useEffect(() => {
-    if (currencySelect !== 'OTHER') {
-      form.setValue('currency_code', currencySelect, { shouldValidate: true })
-    }
-  }, [currencySelect])
   const startDate = form.watch('start_date')
+  // Currency select helper
   // Sincroniza automaticamente a data de término quando a de início mudar
   useEffect(() => {
     if (!startDate) return
@@ -203,25 +191,14 @@ export default function NewTripForm({ onCreated, onCancel, title, submitLabel, i
       <div>
         <label className="block text-sm text-gray-600 mb-1">Moeda</label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <select
-            className="w-full rounded-md border px-3 py-2"
-            value={currencySelect}
-            onChange={(e) => setCurrencySelect(e.target.value as any)}
-          >
-            <option value="BRL">Real (BRL)</option>
-            <option value="USD">Dólar (USD)</option>
-            <option value="EUR">Euro (EUR)</option>
-            <option value="OTHER">Outro</option>
-          </select>
-          {currencySelect === 'OTHER' && (
-            <input
-              className="w-full rounded-md border px-3 py-2 uppercase"
-              placeholder="Código (ex: GBP)"
-              maxLength={3}
-              {...form.register('currency_code')}
-            />
-          )}
-        </div>
+        <input
+          type="text"
+          className="w-full rounded-md border px-3 py-2 bg-gray-100 text-gray-700"
+          value="BRL"
+          disabled
+          readOnly
+          style={{ textTransform: 'uppercase' }}
+        />
         {form.formState.errors.currency_code && (
           <p className="text-sm text-red-500">{form.formState.errors.currency_code.message}</p>
         )}
@@ -246,6 +223,6 @@ export default function NewTripForm({ onCreated, onCancel, title, submitLabel, i
       </button>
     </div>
   </div>
-);
-
+  </div>
+  );
 }
